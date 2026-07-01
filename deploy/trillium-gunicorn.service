@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn service for Trillium School backend
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/home/ubuntu/trillium/backend
+Environment="PATH=/home/ubuntu/trillium/backend/venv/bin"
+ExecStart=/home/ubuntu/trillium/backend/venv/bin/gunicorn --config /home/ubuntu/trillium/backend/gunicorn.conf.py config.wsgi:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
