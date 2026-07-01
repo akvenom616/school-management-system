@@ -11,7 +11,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='trilliumschool.in,www.trilliumschool.in,localhost,127.0.0.1',
+    default='school-management-system-tkx5.onrender.com,trilliumschool.in,www.trilliumschool.in,localhost,127.0.0.1',
     cast=Csv()
 )
 
