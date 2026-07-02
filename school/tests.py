@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
 from .validators import ComplexPasswordValidator
 
@@ -18,3 +19,17 @@ class PasswordValidatorTests(SimpleTestCase):
 
     def test_accepts_a_strong_password(self):
         self.validator.validate('Abc12!wxyz')
+
+
+class StudentSaveFlowTests(TestCase):
+    def test_home_page_exposes_csrf_token(self):
+        response = self.client.get(reverse('home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'csrfmiddlewaretoken')
+
+    def test_home_page_renders_hidden_csrf_token_input(self):
+        response = self.client.get(reverse('home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')

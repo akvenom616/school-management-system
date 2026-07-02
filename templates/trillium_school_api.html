@@ -276,6 +276,7 @@ tr:hover td{background:#fafaf8;}
 </style>
 </head>
 <body>
+{% csrf_token %}
 
 <!-- ========== HOME PAGE ========== -->
 <div id="page-home" class="page active">
@@ -1208,9 +1209,16 @@ function getCookie(name){
   return '';
 }
 
+function getCsrfToken(){
+  const cookieToken = getCookie('csrftoken');
+  if(cookieToken) return cookieToken;
+  const hiddenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  return hiddenInput ? hiddenInput.value : '';
+}
+
 async function apiRequest(url, options = {}){
   const headers = {'Accept': 'application/json', ...(options.headers || {})};
-  const csrfToken = getCookie('csrftoken');
+  const csrfToken = getCsrfToken();
   if(csrfToken && !headers['X-CSRFToken']) headers['X-CSRFToken'] = csrfToken;
   if(options.body && !(headers['Content-Type'] || headers['content-type'])) headers['Content-Type'] = 'application/json';
 
