@@ -1340,7 +1340,15 @@ async function loadStudentsFromServer(){
   try {
     const response = await apiRequest('/api/students/');
     const items = Array.isArray(response) ? response : (response.results || []);
-    students = items.map(normalizeStudentFromApi);
+    const existingPasswords = Object.fromEntries(students.map(s => [s.backendId || s.id, s.password || '']));
+    students = items.map(student => {
+      const normalized = normalizeStudentFromApi(student);
+      const existingPassword = existingPasswords[student.id] || existingPasswords[student.student_id] || '';
+      if(existingPassword && !normalized.password){
+        normalized.password = existingPassword;
+      }
+      return normalized;
+    });
     studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
     await loadFeeComponentsFromServer();
     await loadNoticesFromServer();
