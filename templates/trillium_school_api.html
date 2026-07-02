@@ -858,7 +858,7 @@ function closeGallery(){
       <div class="form-group"><label>Last Name *</label><input type="text" id="ms-lname" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Date of Birth</label><input type="text" id="ms-dob" placeholder="e.g. 12 March 2009" /></div>
+      <div class="form-group"><label>Date of Birth</label><input type="date" id="ms-dob" /></div>
       <div class="form-group"><label>Class</label>
         <select id="ms-class"><option>Pre-Nursery</option><option>Nursery</option><option>LKG</option><option>UKG</option><option>1</option><option>2</option><option>3</option><option>Open</option></select>
       </div>
@@ -1744,9 +1744,10 @@ async function saveStudent(){
     email:(document.getElementById('ms-email').value.trim()||`student-${Date.now()}@example.com`),
     phone:(document.getElementById('ms-contact').value.trim()||'0000000000'),
     class_name:document.getElementById('ms-class').value.trim()||'Pre-Nursery',
-    dob:document.getElementById('ms-dob').value,
     parent_name:document.getElementById('ms-parent').value.trim()
   };
+  const dob = document.getElementById('ms-dob').value;
+  if(dob) payload.dob = dob;
   if(password) payload.password = password;
   
   try {
