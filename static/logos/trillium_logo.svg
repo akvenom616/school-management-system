@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Trillium School Logo">
-  <rect width="256" height="256" rx="48" fill="#173404"/>
-  <path d="M64 80h40v96H64z" fill="#C0DD97"/>
-  <path d="M128 80h40v96h-40z" fill="#97C459"/>
-  <path d="M192 80h40v96h-40z" fill="#639922"/>
-  <path d="M94 192h68v24H94z" fill="#EAF3DE"/>
-  <circle cx="128" cy="128" r="20" fill="#FFFFFF"/>
-</svg>
