@@ -7,9 +7,10 @@ class StudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'name', 'email', 'phone', 'class_name',
-            'dob', 'parent_name', 'student_id', 'created_at'
+            'dob', 'parent_name', 'student_id', 'password', 'created_at'
         ]
         read_only_fields = ['id', 'student_id', 'created_at']
+        extra_kwargs = {'password': {'write_only': True}}
 
 
 class StudentDetailSerializer(serializers.ModelSerializer):

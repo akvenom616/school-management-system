@@ -65,7 +65,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         
         # Generate student ID and password
         student_id = f"STU{secrets.randbelow(100000):05d}"
-        password = generate_random_password(12)
+        password = request.data.get('password') or generate_random_password(12)
         
         student = serializer.save(student_id=student_id, password=password)
         

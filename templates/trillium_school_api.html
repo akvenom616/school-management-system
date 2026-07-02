@@ -91,7 +91,7 @@ footer strong{color:white;font-weight:700;}
 .portal-wrap{min-height:100vh;background:var(--g50);display:flex;align-items:center;justify-content:center;padding:1.25rem;}
 .portal-card{background:white;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);padding:clamp(1.5rem,5vw,2.5rem);width:100%;max-width:420px;border:1px solid rgba(0,0,0,0.04);}
 .portal-logo{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;border:3px solid var(--g200);background:white;padding:3px;box-shadow:0 2px 12px rgba(0,0,0,0.08);flex-shrink:0;}
-.portal-logo img{width:100%;height:100%;border-radius:50%;object-fit:contain;}
+.portal-logo img,.portal-logo svg{width:100%;height:100%;border-radius:50%;object-fit:contain;}
 .portal-card h2{text-align:center;color:var(--g900);font-size:1.2rem;margin-bottom:0.3rem;}
 .portal-card .psub{text-align:center;color:var(--gr600);font-size:0.85rem;margin-bottom:1.75rem;}
 .tab-row{display:grid;grid-template-columns:1fr 1fr;background:var(--gr50);border-radius:8px;padding:3px;margin-bottom:1.5rem;}
@@ -282,7 +282,7 @@ tr:hover td{background:#fafaf8;}
   <nav class="pub-nav">
     <div class="nav-brand" onclick="showPage('home')">
       <div class="nav-logo">
-        <img src="../media/logos/trillium_logo.jpeg" alt="Trillium School Logo" />
+        <img src="backend\media\logos\trillium_logo.jpeg" alt="Trillium School Logo" />
       </div>
       <div class="nav-brand-content">
         <div class="nav-title">TRILLIUM SCHOOL</div>
@@ -530,7 +530,7 @@ function closeGallery(){
   <div class="portal-wrap">
     <div class="portal-card">
       <div class="portal-logo">
-        <img src="../media/logos/trillium_logo.jpeg" alt="Trillium School Logo" />
+        <img src="backend\media\logos\trillium_logo.jpeg" alt="Trillium School Logo" />
       </div>
       <h2>Trillium School Portal</h2>
       <p class="psub">Sign in to access your account</p>
@@ -565,7 +565,7 @@ function closeGallery(){
   <div class="sidebar" id="student-sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-logo">
-        <img src="../media/logos/trillium_logo.jpeg" alt="Trillium School Logo" />
+        <img src="backend\media\logos\trillium_logo.jpeg" alt="Trillium School Logo" /> 
       </div>
       <div class="sidebar-brand-text">
         <h3>Trillium</h3>
@@ -701,7 +701,7 @@ function closeGallery(){
   <div class="sidebar" id="admin-sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-logo">
-        <img src="../media/logos/trillium_logo.jpeg" alt="Trillium School Logo" /> 
+        <img src="/media/logos/trillium_logo.jpeg" alt="Trillium School Logo" />
       </div>
       <div class="sidebar-brand-text">
         <h3>Trillium</h3>
@@ -1130,6 +1130,164 @@ let credViewingId = null;
 let queryReplyingId = null;
 let currentStudentSession = null;
 
+function normalizeStudentFromApi(student){
+  const name = student.name || `${student.fname || ''} ${student.lname || ''}`.trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  const fname = parts[0] || '';
+  const lname = parts.slice(1).join(' ') || '';
+  const studentId = student.student_id || student.id || '';
+  return {
+    backendId: student.id,
+    id: studentId,
+    fname,
+    lname,
+    dob: student.dob || '',
+    classNum: student.class_name || 'Pre-Nursery',
+    section: 'A',
+    blood: 'O+',
+    house: 'Green House',
+    parent: student.parent_name || '',
+    contact: student.phone || '',
+    email: student.email || '',
+    address: '',
+    annualFee: 72000,
+    admissionYear: new Date().getFullYear(),
+    status: 'Active',
+    username: studentId,
+    password: student.password || '',
+    paid: 0,
+    dueDate: '30 June 2025',
+    feeStatus: 'Pending'
+  };
+}
+
+function normalizeFeeComponentFromApi(component){
+  return {
+    id: component.id,
+    name: component.name,
+    amount: Number(component.amount) || 0,
+    freq: component.frequency || component.freq || 'Annual'
+  };
+}
+
+function normalizeNoticeFromApi(notice){
+  return {
+    id: notice.id,
+    title: notice.title,
+    date: notice.date || 'Today',
+    desc: notice.content || ''
+  };
+}
+
+function normalizeFeePaymentFromApi(payment){
+  return {
+    id: payment.id,
+    sid: payment.student_id,
+    quarter: 'Payment',
+    amount: Number(payment.amount) || 0,
+    date: payment.date,
+    mode: payment.mode || 'Online',
+    ref: payment.description || ''
+  };
+}
+
+function normalizeStudentMessageFromApi(message){
+  return {
+    id: message.id,
+    studentId: String(message.student_id || ''),
+    title: message.title,
+    content: message.content,
+    date: message.date
+  };
+}
+
+async function apiRequest(url, options = {}){
+  const response = await fetch(url, {
+    headers: {'Accept': 'application/json', ...(options.headers || {})},
+    ...options
+  });
+  if(!response.ok){
+    const detail = await response.text();
+    throw new Error(detail || 'Request failed');
+  }
+  const contentType = response.headers.get('content-type') || '';
+  if(contentType.includes('application/json')){
+    return response.json();
+  }
+  return response.text();
+}
+
+async function loadStudentsFromServer(){
+  try {
+    const response = await apiRequest('/api/students/');
+    const items = Array.isArray(response) ? response : (response.results || []);
+    students = items.map(normalizeStudentFromApi);
+    studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
+    await loadFeeComponentsFromServer();
+    await loadNoticesFromServer();
+    await loadFeePaymentsFromServer();
+    await loadStudentMessagesFromServer();
+    await loadStudentFeeComponentsFromServer();
+    saveToStorage();
+    renderStudentsTb();
+    renderFeesTb();
+    updateAdminStats();
+    renderNoticesTb();
+    renderPublicNotices();
+  } catch (error) {
+    loadFromStorage();
+  }
+}
+
+async function loadFeeComponentsFromServer(){
+  try {
+    const response = await apiRequest('/api/fee-components/');
+    feeComponents = Array.isArray(response) ? response.map(normalizeFeeComponentFromApi) : feeComponents;
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
+async function loadNoticesFromServer(){
+  try {
+    const response = await apiRequest('/api/notices/');
+    notices = Array.isArray(response) ? response.map(normalizeNoticeFromApi) : notices;
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
+async function loadFeePaymentsFromServer(){
+  try {
+    const response = await apiRequest('/api/fee-payments/');
+    feePayments = Array.isArray(response) ? response.map(normalizeFeePaymentFromApi) : feePayments;
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
+async function loadStudentMessagesFromServer(){
+  try {
+    const response = await apiRequest('/api/student-messages/');
+    studentMessages = Array.isArray(response) ? response.map(normalizeStudentMessageFromApi) : studentMessages;
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
+async function loadStudentFeeComponentsFromServer(){
+  try {
+    const studentList = students.filter(s => s.backendId);
+    const results = await Promise.all(studentList.map(async (student) => {
+      const response = await apiRequest(`/api/student/${student.backendId}/fee-components/`);
+      return [student.id, Array.isArray(response) ? response.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0})) : []];
+    }));
+    studentFeeComponents = Object.fromEntries(results);
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
 // ========== NAV ==========
 function showPage(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
@@ -1345,75 +1503,84 @@ function openEditStudentModal(sid){
   document.getElementById('ms-password').value=s.password;
   document.getElementById('modal-student').classList.add('open');
 }
-function saveStudent(){
+async function saveStudent(){
   const fname=document.getElementById('ms-fname').value.trim();
   const lname=document.getElementById('ms-lname').value.trim();
   const password=document.getElementById('ms-password').value.trim();
   if(!fname||!lname){showToast('First and Last name are required.');return;}
-  if(!password){showToast('Please set a password for this student.');return;}
   
-  let sid;
-  if(editingStudentId){
-    sid=editingStudentId;
-  } else {
-    // Auto-generate Student ID: TRS + 5 random digits
-    sid='TRS'+String(Math.floor(Math.random()*100000)).padStart(5,'0');
-    // Ensure uniqueness
-    while(students.find(s=>s.id===sid)){
-      sid='TRS'+String(Math.floor(Math.random()*100000)).padStart(5,'0');
-    }
-  }
-  
-  const username=sid;
-  
-  const data={
-    id:sid,fname,lname,
+  const payload={
+    name:`${fname} ${lname}`.trim(),
+    email:(document.getElementById('ms-email').value.trim()||`student-${Date.now()}@example.com`),
+    phone:(document.getElementById('ms-contact').value.trim()||'0000000000'),
+    class_name:document.getElementById('ms-class').value.trim()||'Pre-Nursery',
     dob:document.getElementById('ms-dob').value,
-    classNum:document.getElementById('ms-class').value,
-    section:'A',
-    blood:document.getElementById('ms-blood').value,
-    house:'Green House',
-    parent:document.getElementById('ms-parent').value,
-    contact:document.getElementById('ms-contact').value,
-    email:document.getElementById('ms-email').value,
-    address:document.getElementById('ms-address').value,
-    annualFee:72000,
-    admissionYear:parseInt(document.getElementById('ms-adm').value)||new Date().getFullYear(),
-    status:'Active',
-    username,password,
-    paid:0,dueDate:'30 June 2025',feeStatus:'Pending'
+    parent_name:document.getElementById('ms-parent').value.trim()
   };
+  if(password) payload.password = password;
   
-  if(editingStudentId){
-    const idx=students.findIndex(s=>s.id===editingStudentId);
-    if(idx>-1){
-      data.paid=students[idx].paid;
-      data.feeStatus=students[idx].feeStatus;
-      students[idx]=data;
+  try {
+    if(editingStudentId){
+      const student = students.find(s=>s.id===editingStudentId);
+      if(!student || !student.backendId){throw new Error('Student record not found');}
+      const response=await fetch(`/api/students/${student.backendId}/`,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      if(!response.ok) throw new Error('Unable to update student');
+      const updatedStudent = await response.json();
+      const idx=students.findIndex(s=>s.id===editingStudentId);
+      if(idx>-1){
+        const normalized = normalizeStudentFromApi(updatedStudent);
+        normalized.paid = students[idx].paid;
+        normalized.feeStatus = students[idx].feeStatus;
+        students[idx] = normalized;
+      }
+      showToast('Student updated successfully.');
+    } else {
+      const response=await fetch('/api/students/',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      if(!response.ok) throw new Error('Unable to create student');
+      const createdStudent = await response.json();
+      const newStudent = normalizeStudentFromApi(createdStudent);
+      students.push(newStudent);
+      studentFeeComponents[newStudent.id] = [];
+      saveToStorage();
+      showToast('Student added. Student ID: '+newStudent.id+(createdStudent.password? ' | Password: '+createdStudent.password : ''));
     }
-    showToast('Student updated successfully.');
-  } else {
-    students.push(data);
-    // Fee components will be added manually by admin
-    studentFeeComponents[sid] = [];
-    showToast('Student added. Student ID: '+sid+' | Password: '+password);
+    closeModal('modal-student');
+    renderStudentsTb();
+    renderFeesTb();
+    updateAdminStats();
+    saveToStorage();
+  } catch (error) {
+    showToast('Unable to save student. Please try again.');
   }
-  closeModal('modal-student');
-  renderStudentsTb();
-  renderFeesTb();
-  updateAdminStats();
-  saveToStorage();
 }
-function deleteStudent(sid){
+async function deleteStudent(sid){
   if(!confirm('Delete this student? This cannot be undone.'))return;
-  students=students.filter(s=>s.id!==sid);
-  delete studentFeeComponents[sid];
-  feePayments=feePayments.filter(p=>p.sid!==sid);
-  renderStudentsTb();
-  renderFeesTb();
-  updateAdminStats();
-  saveToStorage();
-  showToast('Student deleted.');
+  const student=students.find(s=>s.id===sid);
+  if(!student) return;
+  try {
+    if(student.backendId){
+      const response=await fetch(`/api/students/${student.backendId}/`,{method:'DELETE',headers:{'Accept':'application/json'}});
+      if(!response.ok && response.status !== 404) throw new Error('Unable to delete student');
+    }
+    students=students.filter(s=>s.id!==sid);
+    delete studentFeeComponents[sid];
+    feePayments=feePayments.filter(p=>p.sid!==sid);
+    renderStudentsTb();
+    renderFeesTb();
+    updateAdminStats();
+    saveToStorage();
+    showToast('Student deleted.');
+  } catch (error) {
+    showToast('Unable to delete student. Please try again.');
+  }
 }
 
 // ========== CREDENTIALS MODAL ==========
@@ -1496,20 +1663,34 @@ function renderStudentFeeComponents(sid){
   document.getElementById('mfe-components-list').innerHTML=html;
 }
 
-function addStudentFeeComponent(){
+async function addStudentFeeComponent(){
   const sid=document.getElementById('mfe-sid').value;
+  const student=students.find(s=>s.id===sid);
   const name=document.getElementById('mfe-new-comp-name').value.trim();
   const amount=parseInt(document.getElementById('mfe-new-comp-amt').value);
   
   if(!name||!amount){showToast('Enter component name and amount.');return;}
   if(!studentFeeComponents[sid])studentFeeComponents[sid]=[];
   
-  studentFeeComponents[sid].push({id:Date.now(),name,amount});
-  document.getElementById('mfe-new-comp-name').value='';
-  document.getElementById('mfe-new-comp-amt').value='';
-  
-  renderStudentFeeComponents(sid);
-  saveToStorage();
+  try {
+    const payload={name,amount,frequency:'monthly'};
+    const created = await apiRequest(`/api/student/${student.backendId}/fee-components/`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    studentFeeComponents[sid].push({id:created.id,name:created.name,amount:Number(created.amount)||0});
+    document.getElementById('mfe-new-comp-name').value='';
+    document.getElementById('mfe-new-comp-amt').value='';
+    renderStudentFeeComponents(sid);
+    saveToStorage();
+    showToast('Fee component added.');
+  } catch (error) {
+    studentFeeComponents[sid].push({id:Date.now(),name,amount});
+    renderStudentFeeComponents(sid);
+    saveToStorage();
+    showToast('Fee component added locally.');
+  }
 }
 
 let currentFeeComponentName='';
@@ -1536,8 +1717,17 @@ function addQuickFeeComponent(){
   showToast(currentFeeComponentName+' added successfully.');
 }
 
-function deleteStudentFeeComponent(sid,cid){
+async function deleteStudentFeeComponent(sid,cid){
   if(!confirm('Remove this component?'))return;
+  const student=students.find(s=>s.id===sid);
+  const component = (studentFeeComponents[sid]||[]).find(c=>c.id===cid);
+  try {
+    if(student && student.backendId && component){
+      await apiRequest(`/api/student/${student.backendId}/fee-components/${component.id}/`, {method:'DELETE'});
+    }
+  } catch (error) {
+    // Keep local state if the API call fails.
+  }
   studentFeeComponents[sid]=studentFeeComponents[sid].filter(c=>c.id!==cid);
   renderStudentFeeComponents(sid);
   saveToStorage();
@@ -1557,7 +1747,7 @@ function renderPaymentHistoryForStudent(sid){
   document.getElementById('mfe-payment-history').innerHTML=html;
 }
 
-function recordPaymentFromFeeEdit(){
+async function recordPaymentFromFeeEdit(){
   const sid=document.getElementById('mfe-sid').value;
   const date=document.getElementById('mfe-pay-date').value.trim();
   const amount=parseInt(document.getElementById('mfe-pay-amount').value);
@@ -1566,8 +1756,21 @@ function recordPaymentFromFeeEdit(){
   
   if(!date||!amount){showToast('Enter payment date and amount.');return;}
   
-  // Add to payment history
-  feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+  const student=students.find(x=>x.id===sid);
+  if(student && student.backendId){
+    try {
+      const created = await apiRequest('/api/fee-payments/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id: student.backendId, amount, date, description: ref})
+      });
+      feePayments.push(normalizeFeePaymentFromApi(created));
+    } catch (error) {
+      feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+    }
+  } else {
+    feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+  }
   
   // Update student paid amount
   const s=students.find(x=>x.id===sid);
@@ -1610,12 +1813,28 @@ function openPaymentModal(){
   ['mp-amount','mp-date','mp-ref'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('modal-payment').classList.add('open');
 }
-function savePayment(){
+async function savePayment(){
   const sid=document.getElementById('mp-student').value;
   const amount=parseInt(document.getElementById('mp-amount').value);
   const date=document.getElementById('mp-date').value.trim();
   if(!amount||!date){showToast('Amount and date are required.');return;}
-  feePayments.push({sid,quarter:'Payment',amount,date,mode:document.getElementById('mp-mode').value,ref:document.getElementById('mp-ref').value.trim()});
+  const student=students.find(x=>x.id===sid);
+  const ref=document.getElementById('mp-ref').value.trim();
+  const mode=document.getElementById('mp-mode').value;
+  if(student && student.backendId){
+    try {
+      const created = await apiRequest('/api/fee-payments/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id: student.backendId, amount, date, description: ref})
+      });
+      feePayments.push(normalizeFeePaymentFromApi(created));
+    } catch (error) {
+      feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+    }
+  } else {
+    feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+  }
   const s=students.find(x=>x.id===sid);
   if(s){
     s.paid+=amount;
@@ -1646,19 +1865,28 @@ function renderFeeBuilder(){
       </div>`).join('')
     :'<div style="padding:1rem 1.1rem;color:var(--gr600);font-size:0.85rem;">No components yet. Add one below.</div>';
 }
-function addFeeComponent(){
+async function addFeeComponent(){
   const name=document.getElementById('fc-new-name').value.trim();
   const amount=parseInt(document.getElementById('fc-new-amt').value);
   const freq=document.getElementById('fc-new-freq').value;
   if(!name||!amount){showToast('Enter component name and amount.');return;}
-  feeComponents.push({id:Date.now(),name,amount,freq});
+  try {
+    const created = await apiRequest('/api/fee-components/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,amount,frequency:freq})
+    });
+    feeComponents.push(normalizeFeeComponentFromApi(created));
+  } catch (error) {
+    feeComponents.push({id:Date.now(),name,amount,freq});
+  }
   document.getElementById('fc-new-name').value='';
   document.getElementById('fc-new-amt').value='';
   renderFeeBuilder();
   saveToStorage();
   showToast('Fee component added.');
 }
-function editFeeComponent(id){
+async function editFeeComponent(id){
   const c=feeComponents.find(x=>x.id===id);if(!c)return;
   const newName=prompt('Component name:',c.name);if(newName===null)return;
   const newAmt=prompt('Annual amount (₹):',c.amount);if(newAmt===null)return;
@@ -1666,12 +1894,26 @@ function editFeeComponent(id){
   c.name=newName.trim()||c.name;
   c.amount=parseInt(newAmt)||c.amount;
   c.freq=newFreq.trim()||c.freq;
+  try {
+    await apiRequest(`/api/fee-components/${id}/`, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:c.name,amount:c.amount,frequency:c.freq})
+    });
+  } catch (error) {
+    // Keep local state if the API call fails.
+  }
   renderFeeBuilder();
   saveToStorage();
   showToast('Component updated.');
 }
-function deleteFeeComponent(id){
+async function deleteFeeComponent(id){
   if(!confirm('Remove this fee component?'))return;
+  try {
+    await apiRequest(`/api/fee-components/${id}/`, {method:'DELETE'});
+  } catch (error) {
+    // Keep local state if the API call fails.
+  }
   feeComponents=feeComponents.filter(c=>c.id!==id);
   renderFeeBuilder();
   saveToStorage();
@@ -1691,7 +1933,7 @@ function openSendMessageModal(studentId){
   document.getElementById('modal-student-message').dataset.studentId = studentId;
 }
 
-function saveStudentMessage(){
+async function saveStudentMessage(){
   const studentId = document.getElementById('modal-student-message').dataset.studentId;
   const title = document.getElementById('msm-title-input').value.trim();
   const date = document.getElementById('msm-date-input').value.trim() || 'Today';
@@ -1700,13 +1942,23 @@ function saveStudentMessage(){
     showToast('Title and message are required.');
     return;
   }
-  studentMessages.unshift({
-    id: Date.now(),
-    studentId,
-    title,
-    content,
-    date
-  });
+  const student = students.find(s=>s.id===studentId);
+  try {
+    const created = await apiRequest('/api/student-messages/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({student_id: student ? student.backendId : null, title, content, date})
+    });
+    studentMessages.unshift(normalizeStudentMessageFromApi(created));
+  } catch (error) {
+    studentMessages.unshift({
+      id: Date.now(),
+      studentId,
+      title,
+      content,
+      date
+    });
+  }
   saveToStorage();
   closeModal('modal-student-message');
   showToast('Message sent to student.');
@@ -1735,19 +1987,33 @@ function openNoticeModal(){
   ['mn-title','mn-date','mn-desc'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('modal-notice').classList.add('open');
 }
-function saveNotice(){
+async function saveNotice(){
   const title=document.getElementById('mn-title').value.trim();
   const date=document.getElementById('mn-date').value.trim();
   const desc=document.getElementById('mn-desc').value.trim();
   if(!title){showToast('Notice title is required.');return;}
-  notices.unshift({id:Date.now(),title,date:date||'Today',desc});
+  try {
+    const created = await apiRequest('/api/notices/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title, content:desc, date:date||'Today'})
+    });
+    notices.unshift(normalizeNoticeFromApi(created));
+  } catch (error) {
+    notices.unshift({id:Date.now(),title,date:date||'Today',desc});
+  }
   closeModal('modal-notice');
   renderNoticesTb();
   renderPublicNotices();
   saveToStorage();
   showToast('Notice added.');
 }
-function deleteNotice(id){
+async function deleteNotice(id){
+  try {
+    await apiRequest(`/api/notices/${id}/`, {method:'DELETE'});
+  } catch (error) {
+    // Keep local state if the API call fails.
+  }
   notices=notices.filter(n=>n.id!==id);
   renderNoticesTb();
   renderPublicNotices();
@@ -1918,8 +2184,9 @@ function loadFromStorage(){
 }
 
 // ========== INIT ==========
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   loadFromStorage();
+  await loadStudentsFromServer();
   renderPublicNotices();
   initAutoSave();
 });
