@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage
+from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, Homework
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -83,6 +83,13 @@ class StudentMessageSerializer(serializers.ModelSerializer):
         model = StudentMessage
         fields = ['id', 'student_id', 'student_name', 'title', 'content', 'date', 'created_at']
         read_only_fields = ['id', 'created_at', 'student_id', 'student_name']
+
+
+class HomeworkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Homework
+        fields = ['id', 'title', 'description', 'class_name', 'due_date', 'file', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class NoticeSerializer(serializers.ModelSerializer):

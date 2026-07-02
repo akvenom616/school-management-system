@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage
+from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, Homework
 
 
 @admin.register(Student)
@@ -43,3 +43,10 @@ class StudentMessageAdmin(admin.ModelAdmin):
     list_display = ('student', 'title', 'date')
     search_fields = ('student__name', 'title', 'content')
     list_filter = ('date', 'student__class_name')
+
+
+@admin.register(Homework)
+class HomeworkAdmin(admin.ModelAdmin):
+    list_display = ('title', 'class_name', 'due_date', 'file')
+    search_fields = ('title', 'description', 'class_name')
+    list_filter = ('class_name', 'due_date')

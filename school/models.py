@@ -1,7 +1,10 @@
-from django.db import models
-from django.contrib.auth.models import User
+import os
 import secrets
 import string
+
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.db import models
 
 
 def generate_random_password(length=12):
@@ -18,6 +21,13 @@ def generate_random_password(length=12):
             and any(not char.isalnum() for char in password)
         ):
             return password
+
+
+def validate_homework_file(value):
+    allowed_extensions = {'.pdf', '.doc', '.docx'}
+    ext = os.path.splitext(value.name)[1].lower()
+    if ext not in allowed_extensions:
+        raise ValidationError('Only PDF, DOC, and DOCX files are allowed for homework uploads.')
 
 
 class Student(models.Model):
@@ -118,6 +128,28 @@ class StudentMessage(models.Model):
 
     def __str__(self):
         return f"Message to {self.student.name}: {self.title}"
+
+
+class Homework(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    class_name = models.CharField(max_length=100)
+    due_date = models.DateField(null=True, blank=True)
+    file = models.FileField(
+        upload_to='homework_files/',
+        validators=[validate_homework_file],
+        blank=True,
+        null=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-due_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.class_name})"
 
 
 class Notice(models.Model):

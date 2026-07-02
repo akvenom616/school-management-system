@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 import hashlib
 import secrets
 
-from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, generate_random_password
+from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, Homework, generate_random_password
 from .serializers import (
     StudentSerializer,
     StudentDetailSerializer,
@@ -16,6 +16,7 @@ from .serializers import (
     FeePaymentSerializer,
     NoticeSerializer,
     StudentMessageSerializer,
+    HomeworkSerializer,
 )
 
 
@@ -226,6 +227,19 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         payments = FeePayment.objects.filter(student_id=student_id)
         serializer = self.get_serializer(payments, many=True)
         return Response(serializer.data)
+
+
+class HomeworkViewSet(viewsets.ModelViewSet):
+    """API endpoint for homework uploads visible to students by class."""
+    queryset = Homework.objects.all()
+    serializer_class = HomeworkSerializer
+
+    def get_queryset(self):
+        class_name = self.request.query_params.get('class_name')
+        queryset = Homework.objects.all()
+        if class_name:
+            queryset = queryset.filter(class_name__iexact=class_name)
+        return queryset.order_by('-due_date', '-created_at')
 
 
 class NoticeViewSet(viewsets.ModelViewSet):

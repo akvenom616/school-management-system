@@ -1,9 +1,12 @@
 import json
+from datetime import date
 
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from .models import Homework
 from .validators import ComplexPasswordValidator
 
 
@@ -29,6 +32,22 @@ class StudentSaveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'csrfmiddlewaretoken')
+
+    def test_homework_api_lists_assignments_for_matching_class(self):
+        Homework.objects.create(
+            title='Math Revision',
+            description='Solve the attached worksheet.',
+            class_name='Grade 4',
+            due_date=date(2026, 7, 10),
+            file=SimpleUploadedFile('worksheet.pdf', b'%PDF-1.4', content_type='application/pdf')
+        )
+
+        response = self.client.get(reverse('school:homework-list'), {'class_name': 'Grade 4'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertEqual(response.json()['results'][0]['title'], 'Math Revision')
+        self.assertIn('worksheet.pdf', response.json()['results'][0]['file'])
 
     def test_home_page_renders_hidden_csrf_token_input(self):
         response = self.client.get(reverse('home'))

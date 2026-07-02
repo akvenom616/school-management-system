@@ -578,6 +578,7 @@ function closeGallery(){
       <a onclick="showStudentSec('fees')" id="snav-fees"><span class="sicon">💳</span> Fee Details</a>
       <!-- <a onclick="showStudentSec('schedule')" id="snav-schedule"><span class="sicon">📅</span> Timetable</a> -->
       <a onclick="showStudentSec('results')" id="snav-results"><span class="sicon">📊</span> Results</a>
+      <a onclick="showStudentSec('homework')" id="snav-homework"><span class="sicon">📝</span> Homework</a>
       <a onclick="showStudentSec('query')" id="snav-query"><span class="sicon">💬</span> Send Query</a>
     </nav>
     <div class="sidebar-footer">
@@ -620,6 +621,18 @@ function closeGallery(){
         </div>
         <div class="notice-board" id="student-announcements">
           <div class="notice-hdr">📢 Announcements <span style="font-size:0.72rem;opacity:0.7;">From Admin</span></div>
+        </div>
+      </div>
+
+      <!-- Homework -->
+      <div class="sub-page" id="sp-homework">
+        <div class="dash-header"><h1>Homework</h1><p>Assignments shared by your class teacher</p></div>
+        <div class="table-card">
+          <div class="table-card-hdr"><h3>Current Assignments</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Title</th><th>Due Date</th><th>Description</th><th>Attachment</th></tr></thead>
+            <tbody id="s-homework-tb"></tbody>
+          </table></div>
         </div>
       </div>
 
@@ -714,6 +727,7 @@ function closeGallery(){
       <a onclick="showAdminSec('students')" id="anav-students"><span class="sicon">👥</span> Students</a>
       <a onclick="showAdminSec('fees')" id="anav-fees"><span class="sicon">💰</span> Fee Management</a>
       <a onclick="showAdminSec('notices')" id="anav-notices"><span class="sicon">📋</span> Notices</a>
+      <a onclick="showAdminSec('homework')" id="anav-homework"><span class="sicon">📝</span> Homework</a>
       <a onclick="showAdminSec('queries')" id="anav-queries"><span class="sicon">💬</span> Student Queries</a>
     </nav>
     <div class="sidebar-footer">
@@ -783,6 +797,20 @@ function closeGallery(){
           <div class="table-wrap"><table>
             <thead><tr><th>Date</th><th>Title</th><th>Description</th><th>Actions</th></tr></thead>
             <tbody id="a-notices-tb"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- Homework -->
+      <div class="sub-page" id="ap-homework">
+        <div class="dash-header"><h1>Homework Uploads</h1><p>Upload PDF or DOCX assignments for each class</p></div>
+        <div class="toolbar">
+          <button class="btn-primary" onclick="openHomeworkModal()">+ Upload Homework</button>
+        </div>
+        <div class="table-card">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Title</th><th>Class</th><th>Due Date</th><th>Attachment</th><th>Actions</th></tr></thead>
+            <tbody id="a-homeworks-tb"></tbody>
           </table></div>
         </div>
       </div>
@@ -1010,6 +1038,24 @@ function closeGallery(){
   </div>
 </div>
 
+<!-- Upload Homework Modal -->
+<div class="modal-backdrop" id="modal-homework">
+  <div class="modal" style="max-width:460px;">
+    <h3>Upload Homework</h3>
+    <div class="form-group"><label>Title *</label><input type="text" id="mh-title" /></div>
+    <div class="form-group"><label>Description</label><textarea id="mh-description" rows="3" style="resize:vertical;"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Class *</label><input type="text" id="mh-class" placeholder="e.g. Grade 4" /></div>
+      <div class="form-group"><label>Due Date</label><input type="date" id="mh-due-date" /></div>
+    </div>
+    <div class="form-group"><label>Upload PDF or DOCX *</label><input type="file" id="mh-file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-homework')">Cancel</button>
+      <button class="btn-primary" onclick="saveHomework()">Upload</button>
+    </div>
+  </div>
+</div>
+
 <!-- Send Query Modal -->
 <div class="modal-backdrop" id="modal-query">
   <div class="modal">
@@ -1116,6 +1162,8 @@ let feeComponents = [
   {id:5,name:'Examination Fee',amount:5040,freq:'Annual'}
 ];
 
+let homeworks = [];
+
 let notices = [
   {id:1,title:'Annual Sports Day',date:'Jun 16',desc:'Annual Sports Day on June 28. Students in sports kit by 7:30 AM.'},
   {id:2,title:'Fee Reminder',date:'Jun 14',desc:'Q2 fee deadline is June 30. Late payments attract ₹200/week penalty.'},
@@ -1177,6 +1225,19 @@ function normalizeNoticeFromApi(notice){
     title: notice.title,
     date: notice.date || 'Today',
     desc: notice.content || ''
+  };
+}
+
+function normalizeHomeworkFromApi(homework){
+  const fileUrl = homework.file || '';
+  return {
+    id: homework.id,
+    title: homework.title || '',
+    description: homework.description || '',
+    className: homework.class_name || '',
+    dueDate: homework.due_date || '',
+    file: fileUrl,
+    fileName: fileUrl ? fileUrl.split('/').pop() : 'No file attached'
   };
 }
 
@@ -1259,6 +1320,7 @@ async function loadStudentsFromServer(){
     await loadFeePaymentsFromServer();
     await loadStudentMessagesFromServer();
     await loadStudentFeeComponentsFromServer();
+    await loadHomeworksFromServer();
     saveToStorage();
     renderStudentsTb();
     renderFeesTb();
@@ -1314,6 +1376,15 @@ async function loadStudentFeeComponentsFromServer(){
       return [student.id, Array.isArray(response) ? response.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0})) : []];
     }));
     studentFeeComponents = Object.fromEntries(results);
+  } catch (error) {
+    // Keep local fallback values if the API is unavailable.
+  }
+}
+
+async function loadHomeworksFromServer(){
+  try {
+    const response = await apiRequest('/api/homeworks/');
+    homeworks = Array.isArray(response) ? response.map(normalizeHomeworkFromApi) : homeworks;
   } catch (error) {
     // Keep local fallback values if the API is unavailable.
   }
@@ -1435,6 +1506,7 @@ function loadStudentDash(st){
     ?pmts.map(p=>`<tr><td style="font-weight:600;">₹${p.amount.toLocaleString('en-IN')}</td><td>${p.date}</td><td>${p.mode}</td><td style="font-size:0.78rem;color:var(--gr600);">${p.ref||'—'}</td><td><span class="badge badge-green">Paid</span></td></tr>`).join('')
     :'<tr><td colspan="5" style="text-align:center;color:var(--gr600);">No payments recorded.</td></tr>';
 
+  renderStudentHomeworkTb();
   showStudentSec('profile');
 }
 
@@ -1446,6 +1518,7 @@ function showStudentSec(sec){
   document.getElementById('snav-'+sec).classList.add('active');
   document.getElementById('s-topbar-title').textContent=titles[sec]||sec;
   if(sec==='query')renderStudentQueriesTb();
+  if(sec==='homework')renderStudentHomeworkTb();
   closeSidebar('student');
 }
 
@@ -1467,6 +1540,7 @@ function showAdminSec(sec){
   document.getElementById('anav-'+sec).classList.add('active');
   document.getElementById('a-topbar-title').textContent=titles[sec]||sec;
   if(sec==='queries')renderQueriesTb();
+  if(sec==='homework')renderHomeworkTb();
   closeSidebar('admin');
 }
 function updateAdminStats(){
@@ -1482,6 +1556,104 @@ function renderRecentFees(){
     return `<tr><td>${st?st.fname+' '+st.lname:p.sid}</td><td>${st?st.classNum+'-'+st.section:'—'}</td><td>₹${p.amount.toLocaleString('en-IN')}</td><td>${p.date}</td><td>Payment</td><td><span class="badge badge-green">Paid</span></td></tr>`;
   });
   // Recent Transactions section removed from HTML
+}
+
+// ========== HOMEWORK ==========
+function renderStudentHomeworkTb(){
+  if(!currentStudentSession){
+    document.getElementById('s-homework-tb').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--gr600);">Please sign in to view homework.</td></tr>';
+    return;
+  }
+
+  const studentClass = (currentStudentSession.classNum || '').trim();
+  const filtered = homeworks.filter(item => (item.className || '').toLowerCase() === studentClass.toLowerCase());
+  document.getElementById('s-homework-tb').innerHTML = filtered.length
+    ? filtered.map(item => `
+      <tr>
+        <td style="font-weight:600;color:var(--g900);">${item.title}</td>
+        <td>${item.dueDate || '—'}</td>
+        <td style="font-size:0.82rem;max-width:260px;">${item.description || 'No description provided.'}</td>
+        <td>${item.file ? `<a href="${item.file}" target="_blank" rel="noopener" style="color:var(--t600);">${item.fileName}</a>` : 'No file attached'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--gr600);">No homework assigned to your class yet.</td></tr>';
+}
+
+function renderHomeworkTb(){
+  document.getElementById('a-homeworks-tb').innerHTML = homeworks.length
+    ? homeworks.map(item => `
+      <tr>
+        <td style="font-weight:600;color:var(--g900);">${item.title}</td>
+        <td>${item.className}</td>
+        <td>${item.dueDate || '—'}</td>
+        <td>${item.file ? `<a href="${item.file}" target="_blank" rel="noopener" style="color:var(--t600);">${item.fileName}</a>` : 'No file attached'}</td>
+        <td><button class="btn-sm btn-danger" onclick="deleteHomework(${item.id})">Delete</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--gr600);">No homework uploads yet.</td></tr>';
+}
+
+function openHomeworkModal(){
+  document.getElementById('mh-title').value='';
+  document.getElementById('mh-description').value='';
+  document.getElementById('mh-class').value='';
+  document.getElementById('mh-due-date').value='';
+  document.getElementById('mh-file').value='';
+  document.getElementById('modal-homework').classList.add('open');
+}
+
+async function saveHomework(){
+  const title = document.getElementById('mh-title').value.trim();
+  const description = document.getElementById('mh-description').value.trim();
+  const className = document.getElementById('mh-class').value.trim();
+  const dueDate = document.getElementById('mh-due-date').value;
+  const fileInput = document.getElementById('mh-file');
+
+  if(!title || !className || !fileInput.files[0]){
+    showToast('Title, class, and a file are required.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', description);
+  formData.append('class_name', className);
+  if(dueDate) formData.append('due_date', dueDate);
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    const response = await fetch('/api/homeworks/', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'X-CSRFToken': getCsrfToken()},
+      body: formData
+    });
+    if(!response.ok){
+      const detail = await response.text();
+      throw new Error(detail || 'Unable to upload homework');
+    }
+    const created = await response.json();
+    homeworks.unshift(normalizeHomeworkFromApi(created));
+    closeModal('modal-homework');
+    renderHomeworkTb();
+    renderStudentHomeworkTb();
+    saveToStorage();
+    showToast('Homework uploaded successfully.');
+  } catch (error) {
+    showToast(error.message || 'Unable to upload homework right now.');
+  }
+}
+
+async function deleteHomework(id){
+  if(!confirm('Delete this homework assignment?')) return;
+  try {
+    await apiRequest(`/api/homeworks/${id}/`, {method:'DELETE'});
+  } catch (error) {
+    // Keep local state if the API call fails.
+  }
+  homeworks = homeworks.filter(item => item.id !== id);
+  renderHomeworkTb();
+  renderStudentHomeworkTb();
+  saveToStorage();
+  showToast('Homework removed.');
 }
 
 // ========== STUDENTS TABLE ==========
@@ -2190,6 +2362,7 @@ function saveToStorage(){
   localStorage.setItem('ts_studentFeeComponents',JSON.stringify(studentFeeComponents));
   localStorage.setItem('ts_studentMessages',JSON.stringify(studentMessages));
   localStorage.setItem('ts_queries',JSON.stringify(queries));
+  localStorage.setItem('ts_homeworks',JSON.stringify(homeworks));
 }
 
 function loadFromStorage(){
@@ -2200,6 +2373,7 @@ function loadFromStorage(){
   const stored_studentFeeComps=localStorage.getItem('ts_studentFeeComponents');
   const stored_studentMsgs=localStorage.getItem('ts_studentMessages');
   const stored_queries=localStorage.getItem('ts_queries');
+  const stored_homeworks=localStorage.getItem('ts_homeworks');
   
   if(stored_students)students=JSON.parse(stored_students);
   if(stored_payments)feePayments=JSON.parse(stored_payments);
@@ -2208,6 +2382,7 @@ function loadFromStorage(){
   if(stored_studentFeeComps)studentFeeComponents=JSON.parse(stored_studentFeeComps);
   if(stored_studentMsgs)studentMessages=JSON.parse(stored_studentMsgs);
   if(stored_queries)queries=JSON.parse(stored_queries);
+  if(stored_homeworks)homeworks=JSON.parse(stored_homeworks);
 }
 
 // ========== INIT ==========
