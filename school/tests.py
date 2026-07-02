@@ -1,3 +1,5 @@
+import json
+
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -33,3 +35,23 @@ class StudentSaveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
+
+    def test_student_creation_allows_missing_password(self):
+        payload = {
+            'name': 'Saved Student',
+            'email': 'savedstudent@example.com',
+            'phone': '1234567890',
+            'class_name': 'Pre-Nursery',
+            'dob': '2000-01-01',
+            'parent_name': 'Parent',
+        }
+
+        response = self.client.post(
+            reverse('school:student-list'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn('student_id', response.json())
+        self.assertIn('password', response.json())

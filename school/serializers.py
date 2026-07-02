@@ -10,7 +10,13 @@ class StudentSerializer(serializers.ModelSerializer):
             'dob', 'parent_name', 'student_id', 'password', 'created_at'
         ]
         read_only_fields = ['id', 'student_id', 'created_at']
-        extra_kwargs = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {
+                'write_only': True,
+                'required': False,
+                'allow_blank': True,
+            }
+        }
 
 
 class StudentDetailSerializer(serializers.ModelSerializer):
