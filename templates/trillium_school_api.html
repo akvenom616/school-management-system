@@ -1201,13 +1201,36 @@ function normalizeStudentMessageFromApi(message){
   };
 }
 
+function getCookie(name){
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if(parts.length === 2) return parts.pop().split(';').shift();
+  return '';
+}
+
 async function apiRequest(url, options = {}){
+  const headers = {'Accept': 'application/json', ...(options.headers || {})};
+  const csrfToken = getCookie('csrftoken');
+  if(csrfToken && !headers['X-CSRFToken']) headers['X-CSRFToken'] = csrfToken;
+  if(options.body && !(headers['Content-Type'] || headers['content-type'])) headers['Content-Type'] = 'application/json';
+
   const response = await fetch(url, {
-    headers: {'Accept': 'application/json', ...(options.headers || {})},
+    credentials: 'same-origin',
+    headers,
     ...options
   });
   if(!response.ok){
-    const detail = await response.text();
+    let detail = 'Request failed';
+    try {
+      const payload = await response.json();
+      detail = payload.detail || payload.error || JSON.stringify(payload);
+    } catch (error) {
+      try {
+        detail = await response.text();
+      } catch (textError) {
+        detail = 'Request failed';
+      }
+    }
     throw new Error(detail || 'Request failed');
   }
   const contentType = response.headers.get('content-type') || '';
@@ -1523,13 +1546,11 @@ async function saveStudent(){
     if(editingStudentId){
       const student = students.find(s=>s.id===editingStudentId);
       if(!student || !student.backendId){throw new Error('Student record not found');}
-      const response=await fetch(`/api/students/${student.backendId}/`,{
+      const updatedStudent = await apiRequest(`/api/students/${student.backendId}/`,{
         method:'PUT',
         headers:{'Content-Type':'application/json','Accept':'application/json'},
         body:JSON.stringify(payload)
       });
-      if(!response.ok) throw new Error('Unable to update student');
-      const updatedStudent = await response.json();
       const idx=students.findIndex(s=>s.id===editingStudentId);
       if(idx>-1){
         const normalized = normalizeStudentFromApi(updatedStudent);
@@ -1539,13 +1560,11 @@ async function saveStudent(){
       }
       showToast('Student updated successfully.');
     } else {
-      const response=await fetch('/api/students/',{
+      const createdStudent = await apiRequest('/api/students/',{
         method:'POST',
         headers:{'Content-Type':'application/json','Accept':'application/json'},
         body:JSON.stringify(payload)
       });
-      if(!response.ok) throw new Error('Unable to create student');
-      const createdStudent = await response.json();
       const newStudent = normalizeStudentFromApi(createdStudent);
       students.push(newStudent);
       studentFeeComponents[newStudent.id] = [];
@@ -1558,7 +1577,7 @@ async function saveStudent(){
     updateAdminStats();
     saveToStorage();
   } catch (error) {
-    showToast('Unable to save student. Please try again.');
+    showToast('Unable to save student. ' + (error.message || 'Please try again.'));
   }
 }
 async function deleteStudent(sid){
