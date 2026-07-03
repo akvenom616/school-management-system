@@ -1979,10 +1979,8 @@ async function addStudentFeeComponent(){
     showToast('✅ Fee component added.');
   } catch (error) {
     console.error('Error adding fee component to server:', error);
-    studentFeeComponents[sid].push({id:Date.now(),name,amount});
-    renderStudentFeeComponents(sid);
-    saveToStorage();
-    showToast('⚠️ Fee component added locally (server may be offline).');
+    showToast('⚠️ Unable to add fee component. Please try again.');
+    return;
   }
 }
 
@@ -1996,18 +1994,33 @@ function quickAddFeeComponent(compName){
   document.getElementById('modal-fee-amount').classList.add('open');
 }
 
-function addQuickFeeComponent(){
+async function addQuickFeeComponent(){
   const amount=parseInt(document.getElementById('mfea-amount').value);
   if(!amount||amount<=0){showToast('Enter a valid amount.');return;}
   
   const sid=document.getElementById('mfe-sid').value;
-  if(!studentFeeComponents[sid])studentFeeComponents[sid]=[];
+  const student=students.find(s=>s.id===sid);
+  if(!student || !student.backendId){
+    showToast('Unable to save fee component. Student is not synced to server.');
+    return;
+  }
   
-  studentFeeComponents[sid].push({id:Date.now(),name:currentFeeComponentName,amount});
-  closeModal('modal-fee-amount');
-  renderStudentFeeComponents(sid);
-  saveToStorage();
-  showToast(currentFeeComponentName+' added successfully.');
+  try {
+    const created = await apiRequest(`/api/student/${student.backendId}/fee-components/`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:currentFeeComponentName,amount,frequency:'monthly'})
+    });
+    studentFeeComponents[sid] = studentFeeComponents[sid] || [];
+    studentFeeComponents[sid].push({id:created.id,name:created.name,amount:Number(created.amount)||0});
+    closeModal('modal-fee-amount');
+    renderStudentFeeComponents(sid);
+    saveToStorage();
+    showToast(currentFeeComponentName+' added successfully.');
+  } catch (error) {
+    console.error('Error adding quick fee component:', error);
+    showToast('⚠️ Unable to add fee component. Please try again.');
+  }
 }
 
 async function deleteStudentFeeComponent(sid,cid){
@@ -2146,12 +2159,12 @@ async function savePayment(){
       showToast('✅ Payment recorded successfully.');
     } catch (error) {
       console.error('Error saving payment to server:', error);
-      feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
-      showToast('⚠️ Payment saved locally (server may be offline).');
+      showToast('⚠️ Unable to record payment. Please try again.');
+      return;
     }
   } else {
-    feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
-    showToast('✅ Payment recorded successfully.');
+    showToast('⚠️ Unable to record payment. Student not synced with server.');
+    return;
   }
   const s=students.find(x=>x.id===sid);
   if(s){
@@ -2199,8 +2212,8 @@ async function addFeeComponent(){
     showToast('✅ Fee component added successfully.');
   } catch (error) {
     console.error('Error saving fee component to server:', error);
-    feeComponents.push({id:Date.now(),name,amount,freq});
-    showToast('⚠️ Fee component saved locally (server may be offline).');
+    showToast('⚠️ Unable to add fee component. Please try again.');
+    return;
   }
   document.getElementById('fc-new-name').value='';
   document.getElementById('fc-new-amt').value='';
