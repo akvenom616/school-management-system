@@ -1390,36 +1390,44 @@ async function loadStudentsFromServer(){
 async function loadFeeComponentsFromServer(){
   try {
     const response = await apiRequest('/api/fee-components/');
+    console.log('Fee components API response:', response);
     feeComponents = Array.isArray(response) ? response.map(normalizeFeeComponentFromApi) : feeComponents;
+    console.log('Loaded fee components:', feeComponents);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading fee components:', error);
   }
 }
 
 async function loadNoticesFromServer(){
   try {
     const response = await apiRequest('/api/notices/');
+    console.log('Notices API response:', response);
     notices = Array.isArray(response) ? response.map(normalizeNoticeFromApi) : notices;
+    console.log('Loaded notices:', notices);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading notices:', error);
   }
 }
 
 async function loadFeePaymentsFromServer(){
   try {
     const response = await apiRequest('/api/fee-payments/');
+    console.log('Fee payments API response:', response);
     feePayments = Array.isArray(response) ? response.map(normalizeFeePaymentFromApi) : feePayments;
+    console.log('Loaded fee payments:', feePayments);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading fee payments:', error);
   }
 }
 
 async function loadStudentMessagesFromServer(){
   try {
     const response = await apiRequest('/api/student-messages/');
+    console.log('Student messages API response:', response);
     studentMessages = Array.isArray(response) ? response.map(normalizeStudentMessageFromApi) : studentMessages;
+    console.log('Loaded student messages:', studentMessages);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading student messages:', error);
   }
 }
 
@@ -1439,9 +1447,11 @@ async function loadStudentFeeComponentsFromServer(){
 async function loadHomeworksFromServer(){
   try {
     const response = await apiRequest('/api/homeworks/');
+    console.log('Homeworks API response:', response);
     homeworks = Array.isArray(response) ? response.map(normalizeHomeworkFromApi) : homeworks;
+    console.log('Loaded homeworks:', homeworks);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading homeworks:', error);
   }
 }
 
@@ -1693,17 +1703,20 @@ async function saveHomework(){
     });
     if(!response.ok){
       const detail = await response.text();
+      console.error('Homework upload error response:', detail);
       throw new Error(detail || 'Unable to upload homework');
     }
     const created = await response.json();
+    console.log('Homework API response:', created);
     homeworks.unshift(normalizeHomeworkFromApi(created));
     closeModal('modal-homework');
     renderHomeworkTb();
     renderStudentHomeworkTb();
     saveToStorage();
-    showToast('Homework uploaded successfully.');
+    showToast('✅ Homework uploaded successfully.');
   } catch (error) {
-    showToast(error.message || 'Unable to upload homework right now.');
+    console.error('Error saving homework:', error);
+    showToast('❌ ' + (error.message || 'Unable to upload homework right now.'));
   }
 }
 
@@ -2099,12 +2112,17 @@ async function savePayment(){
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({student_id: student.backendId, amount, date, description: ref})
       });
+      console.log('Payment API response:', created);
       feePayments.push(normalizeFeePaymentFromApi(created));
+      showToast('✅ Payment recorded successfully.');
     } catch (error) {
+      console.error('Error saving payment to server:', error);
       feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+      showToast('⚠️ Payment saved locally (server may be offline).');
     }
   } else {
     feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+    showToast('✅ Payment recorded successfully.');
   }
   const s=students.find(x=>x.id===sid);
   if(s){
@@ -2147,15 +2165,18 @@ async function addFeeComponent(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name,amount,frequency:freq})
     });
+    console.log('Fee component API response:', created);
     feeComponents.push(normalizeFeeComponentFromApi(created));
+    showToast('✅ Fee component added successfully.');
   } catch (error) {
+    console.error('Error saving fee component to server:', error);
     feeComponents.push({id:Date.now(),name,amount,freq});
+    showToast('⚠️ Fee component saved locally (server may be offline).');
   }
   document.getElementById('fc-new-name').value='';
   document.getElementById('fc-new-amt').value='';
   renderFeeBuilder();
   saveToStorage();
-  showToast('Fee component added.');
 }
 async function editFeeComponent(id){
   const c=feeComponents.find(x=>x.id===id);if(!c)return;
@@ -2220,8 +2241,11 @@ async function saveStudentMessage(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({student_id: student ? student.backendId : null, title, content, date})
     });
+    console.log('Student message API response:', created);
     studentMessages.unshift(normalizeStudentMessageFromApi(created));
+    showToast('✅ Message sent to student.');
   } catch (error) {
+    console.error('Error saving message to server:', error);
     studentMessages.unshift({
       id: Date.now(),
       studentId,
@@ -2229,10 +2253,10 @@ async function saveStudentMessage(){
       content,
       date
     });
+    showToast('⚠️ Message saved locally (server may be offline).');
   }
   saveToStorage();
   closeModal('modal-student-message');
-  showToast('Message sent to student.');
   if(currentStudentSession && currentStudentSession.id===studentId){
     loadStudentDash(currentStudentSession);
   }
@@ -2276,15 +2300,19 @@ async function saveNotice(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({title, content:desc, date:date||'Today'})
     });
+    console.log('Notice API response:', created);
     notices.unshift(normalizeNoticeFromApi(created));
+    showToast('✅ Notice added successfully.');
   } catch (error) {
+    console.error('Error saving notice to server:', error);
+    // Fallback to local storage
     notices.unshift({id:Date.now(),title,date:date||'Today',desc});
+    showToast('⚠️ Notice saved locally (server may be offline).');
   }
   closeModal('modal-notice');
   renderNoticesTb();
   renderPublicNotices();
   saveToStorage();
-  showToast('Notice added.');
 }
 async function deleteNotice(id){
   try {
