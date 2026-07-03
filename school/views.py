@@ -175,15 +175,18 @@ class StudentFeeComponentViewSet(viewsets.ModelViewSet):
         student = get_object_or_404(Student, id=student_id)
         
         fee_component_id = request.data.get('fee_component_id')
-        fee_component = get_object_or_404(FeeComponent, id=fee_component_id)
-        
-        # Create StudentFeeComponent with fee component details
-        student_fee = StudentFeeComponent.objects.create(
-            student=student,
-            name=fee_component.name,
-            amount=fee_component.amount,
-            frequency=fee_component.frequency
-        )
+        if fee_component_id:
+            fee_component = get_object_or_404(FeeComponent, id=fee_component_id)
+            student_fee = StudentFeeComponent.objects.create(
+                student=student,
+                name=fee_component.name,
+                amount=fee_component.amount,
+                frequency=fee_component.frequency
+            )
+        else:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            student_fee = serializer.save(student=student)
         
         serializer = self.get_serializer(student_fee)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
