@@ -1436,11 +1436,13 @@ async function loadStudentFeeComponentsFromServer(){
     const studentList = students.filter(s => s.backendId);
     const results = await Promise.all(studentList.map(async (student) => {
       const response = await apiRequest(`/api/student/${student.backendId}/fee-components/`);
+      console.log(`Fee components for student ${student.id}:`, response);
       return [student.id, Array.isArray(response) ? response.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0})) : []];
     }));
     studentFeeComponents = Object.fromEntries(results);
+    console.log('All student fee components loaded:', studentFeeComponents);
   } catch (error) {
-    // Keep local fallback values if the API is unavailable.
+    console.error('Error loading student fee components:', error);
   }
 }
 
@@ -1956,6 +1958,8 @@ async function addStudentFeeComponent(){
   if(!name||!amount){showToast('Enter component name and amount.');return;}
   if(!studentFeeComponents[sid])studentFeeComponents[sid]=[];
   
+  console.log(`Adding fee component for student ${sid}:`, {name, amount, backendId: student?.backendId});
+  
   try {
     const payload={name,amount,frequency:'monthly'};
     const created = await apiRequest(`/api/student/${student.backendId}/fee-components/`, {
@@ -1963,17 +1967,19 @@ async function addStudentFeeComponent(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
     });
+    console.log('Add fee component API response:', created);
     studentFeeComponents[sid].push({id:created.id,name:created.name,amount:Number(created.amount)||0});
     document.getElementById('mfe-new-comp-name').value='';
     document.getElementById('mfe-new-comp-amt').value='';
     renderStudentFeeComponents(sid);
     saveToStorage();
-    showToast('Fee component added.');
+    showToast('✅ Fee component added.');
   } catch (error) {
+    console.error('Error adding fee component to server:', error);
     studentFeeComponents[sid].push({id:Date.now(),name,amount});
     renderStudentFeeComponents(sid);
     saveToStorage();
-    showToast('Fee component added locally.');
+    showToast('⚠️ Fee component added locally (server may be offline).');
   }
 }
 
@@ -2005,16 +2011,19 @@ async function deleteStudentFeeComponent(sid,cid){
   if(!confirm('Remove this component?'))return;
   const student=students.find(s=>s.id===sid);
   const component = (studentFeeComponents[sid]||[]).find(c=>c.id===cid);
+  console.log(`Deleting fee component for student ${sid}:`, {componentId: cid, backendId: student?.backendId, component});
   try {
     if(student && student.backendId && component){
-      await apiRequest(`/api/student/${student.backendId}/fee-components/${component.id}/`, {method:'DELETE'});
+      const deleteResult = await apiRequest(`/api/student/${student.backendId}/fee-components/${component.id}/`, {method:'DELETE'});
+      console.log('Delete fee component API response:', deleteResult);
     }
   } catch (error) {
-    // Keep local state if the API call fails.
+    console.error('Error deleting fee component from server:', error);
   }
   studentFeeComponents[sid]=studentFeeComponents[sid].filter(c=>c.id!==cid);
   renderStudentFeeComponents(sid);
   saveToStorage();
+  showToast('✅ Component removed.');
 }
 
 function renderPaymentHistoryForStudent(sid){
@@ -2072,7 +2081,7 @@ async function recordPaymentFromFeeEdit(){
   showToast('Payment recorded successfully.');
 }
 
-function saveFeeEdit(){
+async function saveFeeEdit(){
   const sid=document.getElementById('mfe-sid').value;
   const s=students.find(x=>x.id===sid);if(!s)return;
   
@@ -2080,15 +2089,32 @@ function saveFeeEdit(){
   const comps=studentFeeComponents[sid]||[];
   const totalFee=comps.reduce((a,c)=>a+c.amount,0);
   
+  console.log(`Saving fee edit for student ${sid}:`, {annualFee: totalFee, paid, dueDate: document.getElementById('mfe-due').value, feeStatus: document.getElementById('mfe-status').value});
+  
   s.annualFee=totalFee;
   s.paid=paid;
   s.dueDate=document.getElementById('mfe-due').value;
   s.feeStatus=document.getElementById('mfe-status').value;
   
+  // Try to persist to server if student has backend ID
+  if(s.backendId){
+    try {
+      const updated = await apiRequest(`/api/students/${s.backendId}/`, {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({annualFee: totalFee, paid, dueDate: s.dueDate, feeStatus: s.feeStatus})
+      });
+      console.log('Fee edit API response:', updated);
+      showToast('✅ Fee record saved to server.');
+    } catch (error) {
+      console.error('Error saving fee to server:', error);
+      showToast('⚠️ Fee saved locally (server may be offline).');
+    }
+  }
+  
   closeModal('modal-fee-edit');
   renderFeesTb();updateAdminStats();renderRecentFees();
   saveToStorage();
-  showToast('Fee record updated.');
 }
 
 // ========== PAYMENT MODAL ==========
