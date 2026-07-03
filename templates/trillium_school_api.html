@@ -1373,15 +1373,18 @@ async function loadStudentsFromServer(){
     await loadStudentFeeComponentsFromServer();
     await loadHomeworksFromServer();
     saveToStorage();
-    renderStudentsTb();
-    renderFeesTb();
-    updateAdminStats();
-    renderNoticesTb();
-    renderPublicNotices();
+    console.log('Successfully loaded all data from server');
   } catch (error) {
     console.error('Failed to load from server:', error);
-    loadFromStorage();
+    throw error; // Re-throw so caller knows to use fallback
   }
+  
+  // Always render UI after any load attempt
+  renderStudentsTb();
+  renderFeesTb();
+  updateAdminStats();
+  renderNoticesTb();
+  renderPublicNotices();
 }
 
 async function loadFeeComponentsFromServer(){
@@ -1596,11 +1599,21 @@ function showAdminSec(sec){
   closeSidebar('admin');
 }
 function updateAdminStats(){
+  const statsStudents = document.getElementById('a-stat-students');
+  const statsQueries = document.getElementById('a-stat-queries');
+  const statsDefault = document.getElementById('a-stat-default');
+  
+  if(!statsStudents || !statsQueries || !statsDefault) {
+    console.log('Admin stats elements not found on this page');
+    return; // Elements don't exist on this page
+  }
+  
   const def=students.filter(s=>s.feeStatus==='Overdue'||s.feeStatus==='Pending').length;
   const pendingQueries=queries.filter(q=>q.status==='Pending').length;
-  document.getElementById('a-stat-students').textContent=students.length;
-  document.getElementById('a-stat-queries').textContent=pendingQueries;
-  document.getElementById('a-stat-default').textContent=def;
+  statsStudents.textContent=students.length;
+  statsQueries.textContent=pendingQueries;
+  statsDefault.textContent=def;
+  console.log('Admin stats updated');
 }
 function renderRecentFees(){
   const rows=[...feePayments].reverse().slice(0,6).map(p=>{
@@ -1710,9 +1723,11 @@ async function deleteHomework(id){
 
 // ========== STUDENTS TABLE ==========
 function renderStudentsTb(){
+  const element = document.getElementById('a-students-tb');
+  if(!element) return; // Element doesn't exist on this page
   const q=(document.getElementById('search-students')||{value:''}).value.toLowerCase();
   const fil=students.filter(s=>(s.fname+' '+s.lname+' '+s.id+' '+s.classNum).toLowerCase().includes(q));
-  document.getElementById('a-students-tb').innerHTML=fil.map(s=>`
+  element.innerHTML=fil.map(s=>`
     <tr>
       <td style="font-weight:600;color:var(--t600);white-space:nowrap;">${s.id}</td>
       <td>${s.fname} ${s.lname}</td>
@@ -1727,6 +1742,7 @@ function renderStudentsTb(){
         <button class="btn-sm btn-danger" style="margin-left:4px;" onclick="deleteStudent('${s.id}')">Delete</button>
       </td>
     </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gr600);">No students found.</td></tr>';
+  console.log('Students table rendered');
 }
 
 // ========== ADD / EDIT STUDENT MODAL ==========
@@ -1864,10 +1880,12 @@ function copyText(elId){
 
 // ========== FEES TABLE ==========
 function renderFeesTb(){
+  const element = document.getElementById('a-fees-tb');
+  if(!element) return; // Element doesn't exist on this page
   const q=(document.getElementById('search-fees')||{value:''}).value.toLowerCase();
   const fil=students.filter(s=>(s.fname+' '+s.lname+' '+s.id).toLowerCase().includes(q));
   const sc={Paid:'badge-green',Partial:'badge-teal',Pending:'badge-amber',Overdue:'badge-red'};
-  document.getElementById('a-fees-tb').innerHTML=fil.map(s=>{
+  element.innerHTML=fil.map(s=>{
     const pen=s.annualFee-s.paid;
     return `<tr>
       <td><strong>${s.fname} ${s.lname}</strong><br><small style="color:var(--gr600);font-size:0.72rem;">${s.id}</small></td>
@@ -1880,6 +1898,7 @@ function renderFeesTb(){
       <td><button class="btn-sm btn-fee" onclick="openFeeEditModal('${s.id}')">Edit</button></td>
     </tr>`;
   }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--gr600);">No records found.</td></tr>';
+  console.log('Fees table rendered');
 }
 function openFeeEditModal(sid){
   const s=students.find(x=>x.id===sid);if(!s)return;
@@ -2221,19 +2240,26 @@ async function saveStudentMessage(){
 
 // ========== NOTICES ==========
 function renderNoticesTb(){
-  document.getElementById('a-notices-tb').innerHTML=notices.map(n=>`
+  const element = document.getElementById('a-notices-tb');
+  if(!element) return; // Element doesn't exist on this page
+  element.innerHTML=notices.map(n=>`
     <tr>
       <td style="font-weight:600;white-space:nowrap;">${n.date}</td>
       <td style="font-weight:600;color:var(--g900);">${n.title}</td>
       <td style="font-size:0.82rem;">${n.desc}</td>
       <td><button class="btn-sm btn-danger" onclick="deleteNotice(${n.id})">Delete</button></td>
     </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;">No notices.</td></tr>';
+  console.log('Notices table rendered');
 }
 function renderPublicNotices(){
   const board=document.getElementById('public-notice-board');
-  if(!board) return; // guard in case the element is missing in some views
+  if(!board) {
+    console.log('Notice board element not found on this page');
+    return; // guard in case the element is missing in some views
+  }
   const items=notices.slice(0,5).map(n=>`<div class="notice-item"><div class="notice-date">${n.date}</div><div class="notice-text"><strong>${n.title}</strong> — ${n.desc}</div></div>`).join('');
   board.innerHTML=`<div class="notice-hdr">📋 School Notices <span style="font-size:0.72rem;opacity:0.7;">June 2025</span></div>${items||'<div class="notice-item"><div class="notice-text">No notices at this time.</div></div>'}`;
+  console.log('Public notices rendered:', notices.length);
 }
 function openNoticeModal(){
   ['mn-title','mn-date','mn-desc'].forEach(id=>document.getElementById(id).value='');
@@ -2423,18 +2449,6 @@ function saveToStorage(){
 }
 
 function loadFromStorage(){
-  const storedVersion = localStorage.getItem('ts_version');
-  const lastUpdate = parseInt(localStorage.getItem('ts_lastUpdate') || '0');
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000;
-  
-  // If version mismatch or data is older than 1 hour, don't use cached data
-  if(storedVersion !== STORAGE_VERSION || (now - lastUpdate > oneHour)){
-    console.log('Clearing stale localStorage cache');
-    localStorage.clear();
-    return;
-  }
-  
   const stored_students=localStorage.getItem('ts_students');
   const stored_payments=localStorage.getItem('ts_feePayments');
   const stored_notices=localStorage.getItem('ts_notices');
@@ -2444,37 +2458,69 @@ function loadFromStorage(){
   const stored_queries=localStorage.getItem('ts_queries');
   const stored_homeworks=localStorage.getItem('ts_homeworks');
   
-  if(stored_students)students=JSON.parse(stored_students);
-  if(stored_payments)feePayments=JSON.parse(stored_payments);
-  if(stored_notices)notices=JSON.parse(stored_notices);
-  if(stored_feeComps)feeComponents=JSON.parse(stored_feeComps);
-  if(stored_studentFeeComps)studentFeeComponents=JSON.parse(stored_studentFeeComps);
-  if(stored_studentMsgs)studentMessages=JSON.parse(stored_studentMsgs);
-  if(stored_queries)queries=JSON.parse(stored_queries);
-  if(stored_homeworks)homeworks=JSON.parse(stored_homeworks);
+  // Load any available data from storage
+  if(stored_students){
+    students=JSON.parse(stored_students);
+    console.log('Loaded students from localStorage');
+  }
+  if(stored_payments){
+    feePayments=JSON.parse(stored_payments);
+    console.log('Loaded payments from localStorage');
+  }
+  if(stored_notices){
+    notices=JSON.parse(stored_notices);
+    console.log('Loaded notices from localStorage');
+  }
+  if(stored_feeComps){
+    feeComponents=JSON.parse(stored_feeComps);
+    console.log('Loaded fee components from localStorage');
+  }
+  if(stored_studentFeeComps){
+    studentFeeComponents=JSON.parse(stored_studentFeeComps);
+    console.log('Loaded student fee components from localStorage');
+  }
+  if(stored_studentMsgs){
+    studentMessages=JSON.parse(stored_studentMsgs);
+    console.log('Loaded messages from localStorage');
+  }
+  if(stored_queries){
+    queries=JSON.parse(stored_queries);
+    console.log('Loaded queries from localStorage');
+  }
+  if(stored_homeworks){
+    homeworks=JSON.parse(stored_homeworks);
+    console.log('Loaded homeworks from localStorage');
+  }
 }
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // Always try to load from server first for fresh data
-  // Only load from localStorage as fallback if server is unavailable
-  const serverLoadStartTime = Date.now();
-  await loadStudentsFromServer();
-  
-  // If server load took too long or failed, try localStorage
-  if(students.length === 0) {
+  try {
+    // Try to load from server first for fresh data
+    await loadStudentsFromServer();
+    console.log('Successfully loaded data from server');
+  } catch (error) {
+    // If server load fails, fall back to localStorage
+    console.log('Server load failed, using localStorage:', error);
     loadFromStorage();
+    
+    // Render UI with loaded data
+    renderStudentsTb();
+    renderFeesTb();
+    updateAdminStats();
+    renderNoticesTb();
+    renderPublicNotices();
   }
   
-  renderPublicNotices();
   initAutoSave();
   
   // Setup periodic refresh every 5 minutes to sync any updates
   setInterval(async () => {
     try {
       await loadStudentsFromServer();
+      console.log('Periodic refresh completed');
     } catch (e) {
-      console.log('Periodic refresh skipped');
+      console.log('Periodic refresh skipped:', e);
     }
   }, 5 * 60 * 1000);
 });
