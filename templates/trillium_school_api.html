@@ -301,7 +301,7 @@ tr:hover td{background:#fafaf8;}
     <div class="nav-brand" onclick="showPage('home')">
       <div class="nav-logo">
         
-        <img src="{% static 'logos/trillium_logo.jpeg' %}" alt="Trillium School Logo"/>
+        <img src="{% static 'logos/trillium_logo.jpeg' %}?v=3" alt="Trillium School Logo"/>
       </div>
       <div class="nav-brand-content">
         <div class="nav-title">TRILLIUM SCHOOL</div>
@@ -550,7 +550,7 @@ function closeGallery(){
   <div class="portal-wrap">
     <div class="portal-card">
       <div class="portal-logo">
-        <img src="{% static 'logos/trillium_logo.jpeg' %}" alt="Trillium School Logo">
+        <img src="{% static 'logos/trillium_logo.jpeg' %}?v=3" alt="Trillium School Logo">
       </div>
       <h2>Trillium School Portal</h2>
       <p class="psub">Sign in to access your account</p>
@@ -585,7 +585,7 @@ function closeGallery(){
   <div class="sidebar" id="student-sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-logo">
-        <img src="{% static 'logos/trillium_logo.jpeg' %}" alt="Trillium School Logo">
+        <img src="{% static 'logos/trillium_logo.jpeg' %}?v=3" alt="Trillium School Logo">
       </div>
       <div class="sidebar-brand-text">
         <h3>Trillium</h3>
@@ -734,7 +734,7 @@ function closeGallery(){
   <div class="sidebar" id="admin-sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-logo">
-        <img src="{% static 'logos/trillium_logo.jpeg' %}" alt="Trillium School Logo" > 
+        <img src="{% static 'logos/trillium_logo.jpeg' %}?v=3" alt="Trillium School Logo" >
       </div>
       <div class="sidebar-brand-text">
         <h3>Trillium</h3>
@@ -2619,7 +2619,7 @@ function showToast(msg){
 }
 
 // ========== LOCAL STORAGE PERSISTENCE ==========
-const STORAGE_VERSION = 'v2';
+const STORAGE_VERSION = 'v3';
 
 function saveToStorage(){
   try {
@@ -2686,6 +2686,22 @@ try{ updateStudentPaidAmounts(); }catch(e){/* ignore during initial parse */}
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async ()=>{
+  // If any service worker or CacheStorage exists from previous deployments,
+  // unregister and clear caches so the client fetches latest files.
+  async function unregisterServiceWorkers(){
+    if('serviceWorker' in navigator){
+      try{
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for(const r of regs) await r.unregister();
+        if(window.caches && caches.keys){
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k=>caches.delete(k)));
+        }
+        console.log('Service workers unregistered and caches cleared');
+      }catch(e){console.warn('Failed to unregister service workers',e)}
+    }
+  }
+  await unregisterServiceWorkers();
   // Load any cached state first to avoid accidental wipes when server returns empty lists
   try{ loadFromStorage(); } catch(e){ console.warn('loadFromStorage failed', e); }
   // Show current app version in UI for cache/debugging purposes
