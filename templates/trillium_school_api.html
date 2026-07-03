@@ -764,7 +764,13 @@ function closeGallery(){
 
       <!-- Overview -->
       <div class="sub-page active" id="ap-overview">
-        <div class="dash-header"><h1>Admin Dashboard</h1><p>Trillium School Management System</p></div>
+        <div class="dash-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h1>Admin Dashboard</h1>
+            <p>Trillium School Management System</p>
+          </div>
+          <button class="btn-primary" onclick="forceRefreshData()" style="white-space:nowrap;"><span>🔄</span> Force Refresh All Data</button>
+        </div>
         <div class="stat-cards">
           <div class="stat-card green"><div class="slabel">Total Students</div><div class="snum" id="a-stat-students">0</div><div class="ssub">Enrolled 2024-25</div></div>
           <div class="stat-card purple"><div class="slabel">Pending Queries</div><div class="snum" id="a-stat-queries">0</div><div class="ssub">From Students</div></div>
@@ -1373,6 +1379,7 @@ async function loadStudentsFromServer(){
     renderNoticesTb();
     renderPublicNotices();
   } catch (error) {
+    console.error('Failed to load from server:', error);
     loadFromStorage();
   }
 }
@@ -2400,6 +2407,8 @@ function showToast(msg){
 }
 
 // ========== LOCAL STORAGE PERSISTENCE ==========
+const STORAGE_VERSION = 'v2';
+
 function saveToStorage(){
   localStorage.setItem('ts_students',JSON.stringify(students));
   localStorage.setItem('ts_feePayments',JSON.stringify(feePayments));
@@ -2409,9 +2418,23 @@ function saveToStorage(){
   localStorage.setItem('ts_studentMessages',JSON.stringify(studentMessages));
   localStorage.setItem('ts_queries',JSON.stringify(queries));
   localStorage.setItem('ts_homeworks',JSON.stringify(homeworks));
+  localStorage.setItem('ts_version', STORAGE_VERSION);
+  localStorage.setItem('ts_lastUpdate', Date.now().toString());
 }
 
 function loadFromStorage(){
+  const storedVersion = localStorage.getItem('ts_version');
+  const lastUpdate = parseInt(localStorage.getItem('ts_lastUpdate') || '0');
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  
+  // If version mismatch or data is older than 1 hour, don't use cached data
+  if(storedVersion !== STORAGE_VERSION || (now - lastUpdate > oneHour)){
+    console.log('Clearing stale localStorage cache');
+    localStorage.clear();
+    return;
+  }
+  
   const stored_students=localStorage.getItem('ts_students');
   const stored_payments=localStorage.getItem('ts_feePayments');
   const stored_notices=localStorage.getItem('ts_notices');
@@ -2433,16 +2456,60 @@ function loadFromStorage(){
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async ()=>{
-  loadFromStorage();
+  // Always try to load from server first for fresh data
+  // Only load from localStorage as fallback if server is unavailable
+  const serverLoadStartTime = Date.now();
   await loadStudentsFromServer();
+  
+  // If server load took too long or failed, try localStorage
+  if(students.length === 0) {
+    loadFromStorage();
+  }
+  
   renderPublicNotices();
   initAutoSave();
+  
+  // Setup periodic refresh every 5 minutes to sync any updates
+  setInterval(async () => {
+    try {
+      await loadStudentsFromServer();
+    } catch (e) {
+      console.log('Periodic refresh skipped');
+    }
+  }, 5 * 60 * 1000);
 });
 
 // ========== AUTO-SAVE ON ALL CHANGES ==========
 function initAutoSave(){
   // Auto-save is now handled inline with saveToStorage() calls in all functions
   // This ensures data persists to localStorage immediately after any change
+}
+
+// Force refresh all data and clear caches
+async function forceRefreshData(){
+  showToast('🔄 Clearing cache and refreshing...');
+  
+  // Clear all localStorage
+  localStorage.clear();
+  
+  // Reset all data to empty
+  students = [];
+  feeComponents = [];
+  feePayments = [];
+  notices = [];
+  studentFeeComponents = {};
+  studentMessages = [];
+  homeworks = [];
+  queries = [];
+  
+  // Reload fresh data from server
+  try {
+    await loadStudentsFromServer();
+    showToast('✅ Data refreshed successfully!');
+  } catch (error) {
+    showToast('⚠️ Could not refresh from server. Please refresh the page manually.');
+    console.error('Force refresh error:', error);
+  }
 }
 
 // Helper function to save data and trigger UI update
