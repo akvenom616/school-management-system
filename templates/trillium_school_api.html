@@ -1232,7 +1232,7 @@ function normalizeStudentFromApi(student){
     contact: student.phone || '',
     email: student.email || '',
     address: '',
-    annualFee: 72000,
+    annualFee: Number(student.annual_fee || student.annualFee || 0),
     admissionYear: new Date().getFullYear(),
     status: 'Active',
     username: studentId,
