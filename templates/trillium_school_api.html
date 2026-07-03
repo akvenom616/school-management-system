@@ -1376,8 +1376,14 @@ async function loadStudentsFromServer(){
   try {
     const response = await apiRequest('/api/students/');
     const items = Array.isArray(response) ? response : (response.results || []);
-    students = items.map(student => normalizeStudentFromApi(student));
-    studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
+    if (items && items.length) {
+      students = items.map(student => normalizeStudentFromApi(student));
+      studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
+    } else {
+      console.warn('No students returned from server; restoring from local storage and aborting server refresh.');
+      loadFromStorage();
+      return;
+    }
     await loadFeeComponentsFromServer();
     await loadNoticesFromServer();
     await loadFeePaymentsFromServer();
