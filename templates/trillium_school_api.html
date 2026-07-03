@@ -1187,13 +1187,7 @@ let studentFeeComponents = {};
 let studentMessages = [];
 
 // Global fee components – admin builds these, students see them
-let feeComponents = [
-  {id:1,name:'Tuition Fee',amount:43200,freq:'Quarterly'},
-  {id:2,name:'Development Fee',amount:10800,freq:'Quarterly'},
-  {id:3,name:'Sports & Activity Fee',amount:7200,freq:'Quarterly'},
-  {id:4,name:'Lab & Library Fee',amount:5760,freq:'Annual'},
-  {id:5,name:'Examination Fee',amount:5040,freq:'Annual'}
-];
+let feeComponents = [];
 
 let homeworks = [];
 
@@ -1219,7 +1213,17 @@ function normalizeStudentFromApi(student){
   const lname = parts.slice(1).join(' ') || '';
   const studentId = student.student_id || student.id || '';
   // Preserve any locally stored password if backend omits it
-  const existing = students.find(s => s.id === studentId);
+  let storedPwd = '';
+  try {
+    const raw = localStorage.getItem('ts_students');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)){
+        const found = parsed.find(x=>x.id===studentId);
+        if(found && found.password) storedPwd = found.password;
+      }
+    }
+  } catch(e){/* ignore */}
 
   // Compute default annual fee from global fee components + student-specific components
   const globalSum = (feeComponents || []).reduce((a, c) => a + (Number(c.amount) || 0), 0);
@@ -1232,7 +1236,7 @@ function normalizeStudentFromApi(student){
     (student.annualFee !== undefined ? student.annualFee : (globalSum + studentExtra))
   ) || 0;
 
-  const pwd = ('password' in student) ? student.password : (existing ? existing.password : '');
+  const pwd = ('password' in student) ? student.password : (storedPwd || '');
 
   return {
     backendId: student.id,
@@ -1381,6 +1385,17 @@ async function loadStudentsFromServer(){
     await loadStudentFeeComponentsFromServer();
     await loadHomeworksFromServer();
     console.log('Successfully loaded all data from server');
+    // Compute annualFee for students that don't have it from backend
+    try {
+      const globalSum = (feeComponents || []).reduce((a, c) => a + (Number(c.amount) || 0), 0);
+      students.forEach(s => {
+        if (!s.annualFee || Number(s.annualFee) === 0) {
+          const extra = (studentFeeComponents[s.id] || []).reduce((a, c) => a + (Number(c.amount) || 0), 0);
+          s.annualFee = globalSum + extra;
+        }
+      });
+      console.log('Computed annualFee for students after component load:', students.map(s=>({id:s.id,annualFee:s.annualFee})).slice(0,5));
+    } catch(e){console.error('Error computing annual fees:',e)}
   } catch (error) {
     console.error('Failed to load from server:', error);
     throw error;
