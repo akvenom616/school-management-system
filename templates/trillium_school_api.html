@@ -4,6 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Trillium School</title>
 <style>
 :root {
@@ -311,6 +314,7 @@ tr:hover td{background:#fafaf8;}
       <a onclick="scrollToSection('notices')">Notices</a>
       <a onclick="scrollToSection('contact')">Contact</a>
       <button class="btn-portal" onclick="showPage('login')">🎓 Student Portal</button>
+      <div id="app-version" style="font-size:0.72rem;color:rgba(255,255,255,0.85);padding-left:8px;opacity:0.9">v?</div>
     </div>
     <button class="hamburger" onclick="toggleMobileMenu()">☰</button>
   </nav>
@@ -2690,6 +2694,14 @@ try{ updateStudentPaidAmounts(); }catch(e){/* ignore during initial parse */}
 document.addEventListener('DOMContentLoaded', async ()=>{
   // Load any cached state first to avoid accidental wipes when server returns empty lists
   try{ loadFromStorage(); } catch(e){ console.warn('loadFromStorage failed', e); }
+  // Show current app version in UI for cache/debugging purposes
+  try{
+    const verEl = document.getElementById('app-version');
+    if(verEl){
+      const v = localStorage.getItem('ts_version') || STORAGE_VERSION || 'v?';
+      verEl.textContent = v;
+    }
+  }catch(e){}
   try {
     // Try to load from server first for fresh data
     await loadStudentsFromServer();
