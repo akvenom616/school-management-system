@@ -1218,6 +1218,22 @@ function normalizeStudentFromApi(student){
   const fname = parts[0] || '';
   const lname = parts.slice(1).join(' ') || '';
   const studentId = student.student_id || student.id || '';
+  // Preserve any locally stored password if backend omits it
+  const existing = students.find(s => s.id === studentId);
+
+  // Compute default annual fee from global fee components + student-specific components
+  const globalSum = (feeComponents || []).reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const studentExtra = (studentFeeComponents && studentFeeComponents[studentId])
+    ? (studentFeeComponents[studentId].reduce((a, c) => a + (Number(c.amount) || 0), 0))
+    : 0;
+
+  const annual = Number(
+    student.annual_fee !== undefined ? student.annual_fee :
+    (student.annualFee !== undefined ? student.annualFee : (globalSum + studentExtra))
+  ) || 0;
+
+  const pwd = ('password' in student) ? student.password : (existing ? existing.password : '');
+
   return {
     backendId: student.id,
     id: studentId,
@@ -1232,14 +1248,14 @@ function normalizeStudentFromApi(student){
     contact: student.phone || '',
     email: student.email || '',
     address: '',
-    annualFee: Number(student.annual_fee || student.annualFee || 0),
+    annualFee: annual,
     admissionYear: new Date().getFullYear(),
     status: 'Active',
     username: studentId,
-    password: student.password || '',
-    paid: 0,
-    dueDate: '30 June 2025',
-    feeStatus: 'Pending'
+    password: pwd,
+    paid: Number(student.paid) || 0,
+    dueDate: student.dueDate || '30 June 2025',
+    feeStatus: student.feeStatus || 'Pending'
   };
 }
 
