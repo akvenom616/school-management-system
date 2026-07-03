@@ -2449,8 +2449,16 @@ async function saveNotice(){
     showToast('✅ Notice added successfully.');
   } catch (error) {
     console.error('Error saving notice to server:', error);
-    showToast('⚠️ Unable to save notice. Please try again.');
-    return;
+    // Fallback: save notice locally so it persists across refreshes even when
+    // the server call fails (offline mode).
+    const localNotice = {
+      id: Date.now(),
+      title: title,
+      date: date || (new Date().getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()]),
+      desc: desc || ''
+    };
+    notices.unshift(localNotice);
+    showToast('⚠️ Unable to save to server — saved locally.');
   }
   closeModal('modal-notice');
   renderNoticesTb();
