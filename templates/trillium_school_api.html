@@ -2378,9 +2378,8 @@ async function saveNotice(){
     showToast('✅ Notice added successfully.');
   } catch (error) {
     console.error('Error saving notice to server:', error);
-    // Fallback to local storage
-    notices.unshift({id:Date.now(),title,date:date||'Today',desc});
-    showToast('⚠️ Notice saved locally (server may be offline).');
+    showToast('⚠️ Unable to save notice. Please try again.');
+    return;
   }
   closeModal('modal-notice');
   renderNoticesTb();
