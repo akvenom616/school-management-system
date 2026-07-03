@@ -1295,15 +1295,54 @@ function normalizeHomeworkFromApi(homework){
 }
 
 function normalizeFeePaymentFromApi(payment){
+  // Normalize payment and resolve `sid` to the frontend student `id` when possible.
+  const amount = Number(payment.amount) || 0;
+  const date = payment.date;
+  const mode = payment.mode || 'Online';
+  const ref = payment.description || '';
+
+  // payment.student_id from the API is the backend PK. Try to map it to the
+  // frontend student `id` (e.g. STUxxxxx) using the loaded `students` array.
+  let sid = payment.student_id;
+  try {
+    const found = students && students.find(s => String(s.backendId) === String(payment.student_id));
+    if (found) sid = found.id;
+  } catch (e) {
+    // ignore — fallback to raw value
+  }
+
   return {
     id: payment.id,
-    sid: payment.student_id,
+    sid: sid,
     quarter: 'Payment',
-    amount: Number(payment.amount) || 0,
-    date: payment.date,
-    mode: payment.mode || 'Online',
-    ref: payment.description || ''
+    amount,
+    date,
+    mode,
+    ref
   };
+}
+
+// Recompute `paid` on each student from the loaded `feePayments` array.
+function updateStudentPaidAmounts(){
+  if(!Array.isArray(students) || !Array.isArray(feePayments)) return;
+  // Reset paid values first
+  students.forEach(s => { s.paid = 0; });
+  // Sum payments grouped by student frontend id
+  feePayments.forEach(p => {
+    try {
+      const sid = String(p.sid || '');
+      const student = students.find(s => String(s.id) === sid || String(s.backendId) === sid);
+      if(student) student.paid = Number(student.paid || 0) + Number(p.amount || 0);
+    } catch(e) {
+      // ignore malformed payment
+    }
+  });
+  // Recompute feeStatus/dueDate for UI consistency
+  students.forEach(s => {
+    const rem = (Number(s.annualFee) || 0) - (Number(s.paid) || 0);
+    s.feeStatus = rem <= 0 ? 'Paid' : (s.paid > 0 ? 'Partial' : 'Pending');
+    if(rem <= 0) s.dueDate = '—';
+  });
 }
 
 function normalizeStudentMessageFromApi(message){
@@ -1464,6 +1503,8 @@ async function loadFeePaymentsFromServer(){
       console.log('No fee payments received from server; preserving existing payments.');
     }
     console.log('Loaded fee payments:', feePayments);
+    // Recompute per-student paid totals whenever payments are (re)loaded
+    try{ updateStudentPaidAmounts(); }catch(e){console.error('Failed to update student paid amounts:',e)}
   } catch (error) {
     console.error('Error loading fee payments:', error);
   }
@@ -2633,6 +2674,9 @@ function loadFromStorage(){
     console.log('Loaded homeworks from localStorage');
   }
 }
+
+// Ensure paid totals reflect any persisted payments when loading from storage
+try{ updateStudentPaidAmounts(); }catch(e){/* ignore during initial parse */}
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async ()=>{
