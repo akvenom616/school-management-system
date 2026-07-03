@@ -1356,15 +1356,7 @@ async function loadStudentsFromServer(){
   try {
     const response = await apiRequest('/api/students/');
     const items = Array.isArray(response) ? response : (response.results || []);
-    const existingPasswords = Object.fromEntries(students.map(s => [s.backendId || s.id, s.password || '']));
-    students = items.map(student => {
-      const normalized = normalizeStudentFromApi(student);
-      const existingPassword = existingPasswords[student.id] || existingPasswords[student.student_id] || '';
-      if(existingPassword && !normalized.password){
-        normalized.password = existingPassword;
-      }
-      return normalized;
-    });
+    students = items.map(student => normalizeStudentFromApi(student));
     studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
     await loadFeeComponentsFromServer();
     await loadNoticesFromServer();
@@ -1372,11 +1364,10 @@ async function loadStudentsFromServer(){
     await loadStudentMessagesFromServer();
     await loadStudentFeeComponentsFromServer();
     await loadHomeworksFromServer();
-    saveToStorage();
     console.log('Successfully loaded all data from server');
   } catch (error) {
     console.error('Failed to load from server:', error);
-    throw error; // Re-throw so caller knows to use fallback
+    throw error;
   }
   
   // Always render UI after any load attempt
@@ -1387,11 +1378,18 @@ async function loadStudentsFromServer(){
   renderPublicNotices();
 }
 
+function parseApiList(response){
+  if (Array.isArray(response)) return response;
+  if (response && Array.isArray(response.results)) return response.results;
+  return [];
+}
+
 async function loadFeeComponentsFromServer(){
   try {
     const response = await apiRequest('/api/fee-components/');
     console.log('Fee components API response:', response);
-    feeComponents = Array.isArray(response) ? response.map(normalizeFeeComponentFromApi) : feeComponents;
+    const list = parseApiList(response);
+    feeComponents = list.map(normalizeFeeComponentFromApi);
     console.log('Loaded fee components:', feeComponents);
   } catch (error) {
     console.error('Error loading fee components:', error);
@@ -1402,7 +1400,8 @@ async function loadNoticesFromServer(){
   try {
     const response = await apiRequest('/api/notices/');
     console.log('Notices API response:', response);
-    notices = Array.isArray(response) ? response.map(normalizeNoticeFromApi) : notices;
+    const list = parseApiList(response);
+    notices = list.map(normalizeNoticeFromApi);
     console.log('Loaded notices:', notices);
   } catch (error) {
     console.error('Error loading notices:', error);
@@ -1413,7 +1412,8 @@ async function loadFeePaymentsFromServer(){
   try {
     const response = await apiRequest('/api/fee-payments/');
     console.log('Fee payments API response:', response);
-    feePayments = Array.isArray(response) ? response.map(normalizeFeePaymentFromApi) : feePayments;
+    const list = parseApiList(response);
+    feePayments = list.map(normalizeFeePaymentFromApi);
     console.log('Loaded fee payments:', feePayments);
   } catch (error) {
     console.error('Error loading fee payments:', error);
@@ -1424,7 +1424,8 @@ async function loadStudentMessagesFromServer(){
   try {
     const response = await apiRequest('/api/student-messages/');
     console.log('Student messages API response:', response);
-    studentMessages = Array.isArray(response) ? response.map(normalizeStudentMessageFromApi) : studentMessages;
+    const list = parseApiList(response);
+    studentMessages = list.map(normalizeStudentMessageFromApi);
     console.log('Loaded student messages:', studentMessages);
   } catch (error) {
     console.error('Error loading student messages:', error);
@@ -1437,7 +1438,8 @@ async function loadStudentFeeComponentsFromServer(){
     const results = await Promise.all(studentList.map(async (student) => {
       const response = await apiRequest(`/api/student/${student.backendId}/fee-components/`);
       console.log(`Fee components for student ${student.id}:`, response);
-      return [student.id, Array.isArray(response) ? response.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0})) : []];
+      const list = parseApiList(response);
+      return [student.id, list.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0}))];
     }));
     studentFeeComponents = Object.fromEntries(results);
     console.log('All student fee components loaded:', studentFeeComponents);
@@ -1450,7 +1452,8 @@ async function loadHomeworksFromServer(){
   try {
     const response = await apiRequest('/api/homeworks/');
     console.log('Homeworks API response:', response);
-    homeworks = Array.isArray(response) ? response.map(normalizeHomeworkFromApi) : homeworks;
+    const list = parseApiList(response);
+    homeworks = list.map(normalizeHomeworkFromApi);
     console.log('Loaded homeworks:', homeworks);
   } catch (error) {
     console.error('Error loading homeworks:', error);
@@ -2554,16 +2557,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     await loadStudentsFromServer();
     console.log('Successfully loaded data from server');
   } catch (error) {
-    // If server load fails, fall back to localStorage
-    console.log('Server load failed, using localStorage:', error);
-    loadFromStorage();
-    
-    // Render UI with loaded data
-    renderStudentsTb();
-    renderFeesTb();
-    updateAdminStats();
-    renderNoticesTb();
-    renderPublicNotices();
+    console.error('Server load failed:', error);
+    showToast('Server load failed. School data may be unavailable.');
   }
   
   initAutoSave();
@@ -2587,12 +2582,9 @@ function initAutoSave(){
 
 // Force refresh all data and clear caches
 async function forceRefreshData(){
-  showToast('🔄 Clearing cache and refreshing...');
+  showToast('🔄 Refreshing data from server...');
   
-  // Clear all localStorage
-  localStorage.clear();
-  
-  // Reset all data to empty
+  // Reset all cached state and reload fresh data from server
   students = [];
   feeComponents = [];
   feePayments = [];
@@ -2602,7 +2594,6 @@ async function forceRefreshData(){
   homeworks = [];
   queries = [];
   
-  // Reload fresh data from server
   try {
     await loadStudentsFromServer();
     showToast('✅ Data refreshed successfully!');
