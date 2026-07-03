@@ -2566,16 +2566,27 @@ function showToast(msg){
 const STORAGE_VERSION = 'v2';
 
 function saveToStorage(){
-  localStorage.setItem('ts_students',JSON.stringify(students));
-  localStorage.setItem('ts_feePayments',JSON.stringify(feePayments));
-  localStorage.setItem('ts_notices',JSON.stringify(notices));
-  localStorage.setItem('ts_feeComponents',JSON.stringify(feeComponents));
-  localStorage.setItem('ts_studentFeeComponents',JSON.stringify(studentFeeComponents));
-  localStorage.setItem('ts_studentMessages',JSON.stringify(studentMessages));
-  localStorage.setItem('ts_queries',JSON.stringify(queries));
-  localStorage.setItem('ts_homeworks',JSON.stringify(homeworks));
-  localStorage.setItem('ts_version', STORAGE_VERSION);
-  localStorage.setItem('ts_lastUpdate', Date.now().toString());
+  // Only overwrite stored arrays when current data is non-empty, to avoid wiping local-only data
+  const conditionalSet = (key, value) => {
+    try {
+      const stored = localStorage.getItem(key);
+      if ((Array.isArray(value) && value.length === 0) && stored) {
+        // keep existing stored value
+        return;
+      }
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) { console.warn('saveToStorage error for', key, e); }
+  };
+
+  conditionalSet('ts_students', students);
+  conditionalSet('ts_feePayments', feePayments);
+  conditionalSet('ts_notices', notices);
+  conditionalSet('ts_feeComponents', feeComponents);
+  conditionalSet('ts_studentFeeComponents', studentFeeComponents);
+  conditionalSet('ts_studentMessages', studentMessages);
+  conditionalSet('ts_queries', queries);
+  conditionalSet('ts_homeworks', homeworks);
+  try { localStorage.setItem('ts_version', STORAGE_VERSION); localStorage.setItem('ts_lastUpdate', Date.now().toString()); } catch(e){/*ignore*/}
 }
 
 function loadFromStorage(){
@@ -2625,6 +2636,8 @@ function loadFromStorage(){
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async ()=>{
+  // Load any cached state first to avoid accidental wipes when server returns empty lists
+  try{ loadFromStorage(); } catch(e){ console.warn('loadFromStorage failed', e); }
   try {
     // Try to load from server first for fresh data
     await loadStudentsFromServer();
