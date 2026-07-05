@@ -939,7 +939,7 @@ function closeGallery(){
       <div class="form-group"><label>Amount (₹) *</label><input type="number" id="mp-amount" placeholder="e.g. 18000" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Payment Date *</label><input type="text" id="mp-date" placeholder="e.g. 16 June 2025" /></div>
+      <div class="form-group"><label>Payment Date *</label><input type="date" id="mp-date" /></div>
       <div class="form-group"><label>Mode</label>
         <select id="mp-mode"><option>Online</option><option>Cash</option><option>Cheque</option><option>DD</option></select>
       </div>
@@ -995,7 +995,7 @@ function closeGallery(){
     <div style="margin-top:1.5rem;padding:1rem;background:var(--b50);border-radius:10px;border:1px solid var(--b100);">
       <div style="font-size:0.9rem;font-weight:600;color:var(--b900);margin-bottom:0.75rem;">💳 Record Payment</div>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:0.75rem;">
-        <input type="text" id="mfe-pay-date" placeholder="Payment Date (e.g. 16 June 2025)" style="padding:8px;border:1px solid var(--b600);border-radius:6px;font-size:0.85rem;" />
+        <input type="date" id="mfe-pay-date" style="padding:8px;border:1px solid var(--b600);border-radius:6px;font-size:0.85rem;" />
         <input type="number" id="mfe-pay-amount" placeholder="Amount ₹" style="padding:8px;border:1px solid var(--b600);border-radius:6px;font-size:0.85rem;" />
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0.75rem;">
@@ -1039,7 +1039,7 @@ function closeGallery(){
   <div class="modal" style="max-width:440px;">
     <h3>Add New Notice</h3>
     <div class="form-group"><label>Title *</label><input type="text" id="mn-title" /></div>
-    <div class="form-group"><label>Date</label><input type="text" id="mn-date" placeholder="e.g. Jun 16" /></div>
+    <div class="form-group"><label>Date</label><input type="date" id="mn-date" /></div>
     <div class="form-group"><label>Description</label><textarea id="mn-desc" rows="3" style="resize:vertical;"></textarea></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('modal-notice')">Cancel</button>
@@ -1054,7 +1054,7 @@ function closeGallery(){
     <h3 id="msm-title">Send Message to Student</h3>
     <div class="form-group"><label>Student</label><input type="text" id="msm-student" readonly /></div>
     <div class="form-group"><label>Title *</label><input type="text" id="msm-title-input" /></div>
-    <div class="form-group"><label>Date</label><input type="text" id="msm-date-input" placeholder="e.g. Jun 16" /></div>
+    <div class="form-group"><label>Date</label><input type="date" id="msm-date-input" /></div>
     <div class="form-group"><label>Message *</label><textarea id="msm-content-input" rows="4" style="resize:vertical;"></textarea></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('modal-student-message')">Cancel</button>
@@ -2183,7 +2183,7 @@ function renderPaymentHistoryForStudent(sid){
 
 async function recordPaymentFromFeeEdit(){
   const sid=document.getElementById('mfe-sid').value;
-  const date=document.getElementById('mfe-pay-date').value.trim();
+  const date=document.getElementById('mfe-pay-date').value || new Date().toISOString().slice(0,10);
   const amount=parseInt(document.getElementById('mfe-pay-amount').value);
   const mode=document.getElementById('mfe-pay-mode').value;
   const ref=document.getElementById('mfe-pay-ref').value.trim();
@@ -2200,7 +2200,9 @@ async function recordPaymentFromFeeEdit(){
       });
       feePayments.push(normalizeFeePaymentFromApi(created));
     } catch (error) {
-      feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
+      console.error('Error saving payment to server:', error);
+      showToast('⚠️ Unable to record payment on server. Please try again.');
+      return;
     }
   } else {
     feePayments.push({sid,quarter:'Payment',amount,date,mode,ref});
@@ -2267,7 +2269,7 @@ function openPaymentModal(){
 async function savePayment(){
   const sid=document.getElementById('mp-student').value;
   const amount=parseInt(document.getElementById('mp-amount').value);
-  const date=document.getElementById('mp-date').value.trim();
+  const date=document.getElementById('mp-date').value || new Date().toISOString().slice(0,10);
   if(!amount||!date){showToast('Amount and date are required.');return;}
   const student=students.find(x=>x.id===sid);
   const ref=document.getElementById('mp-ref').value.trim();
@@ -2301,7 +2303,6 @@ async function savePayment(){
   closeModal('modal-payment');
   renderFeesTb();updateAdminStats();renderRecentFees();
   saveToStorage();
-  showToast('Payment recorded successfully.');
 }
 
 // ========== FEE STRUCTURE BUILDER ==========
@@ -2386,7 +2387,7 @@ function openSendMessageModal(studentId){
   document.getElementById('msm-title').textContent = `Send Message to ${student.fname} ${student.lname}`;
   document.getElementById('msm-student').value = `${student.fname} ${student.lname} (${student.id})`;
   document.getElementById('msm-title-input').value = '';
-  document.getElementById('msm-date-input').value = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  document.getElementById('msm-date-input').value = new Date().toISOString().slice(0,10);
   document.getElementById('msm-content-input').value = '';
   document.getElementById('modal-student-message').classList.add('open');
   document.getElementById('modal-student-message').dataset.studentId = studentId;
@@ -2395,7 +2396,7 @@ function openSendMessageModal(studentId){
 async function saveStudentMessage(){
   const studentId = document.getElementById('modal-student-message').dataset.studentId;
   const title = document.getElementById('msm-title-input').value.trim();
-  const date = document.getElementById('msm-date-input').value.trim() || 'Today';
+  const date = document.getElementById('msm-date-input').value || new Date().toISOString().slice(0,10);
   const content = document.getElementById('msm-content-input').value.trim();
   if(!studentId || !title || !content){
     showToast('Title and message are required.');
@@ -2458,14 +2459,14 @@ function openNoticeModal(){
 }
 async function saveNotice(){
   const title=document.getElementById('mn-title').value.trim();
-  const date=document.getElementById('mn-date').value.trim();
+  const date=document.getElementById('mn-date').value || new Date().toISOString().slice(0,10);
   const desc=document.getElementById('mn-desc').value.trim();
   if(!title){showToast('Notice title is required.');return;}
   try {
     const created = await apiRequest('/api/notices/', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title, content:desc, date:date||'Today'})
+      body:JSON.stringify({title, content:desc, date:date})
     });
     console.log('Notice API response:', created);
     notices.unshift(normalizeNoticeFromApi(created));
@@ -2477,7 +2478,7 @@ async function saveNotice(){
     const localNotice = {
       id: Date.now(),
       title: title,
-      date: date || (new Date().getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()]),
+      date: date || new Date().toISOString().slice(0,10),
       desc: desc || ''
     };
     notices.unshift(localNotice);
