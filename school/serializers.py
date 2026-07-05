@@ -12,7 +12,6 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'student_id', 'created_at']
         extra_kwargs = {
             'password': {
-                'write_only': True,
                 'required': False,
                 'allow_blank': True,
             }

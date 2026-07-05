@@ -1993,11 +1993,27 @@ function resetPassword(){
   if(!np){showToast('Enter a new password.');return;}
   const s=students.find(x=>x.id===credViewingId);
   if(!s)return;
-  s.password=np;
-  document.getElementById('mc-password').textContent=np;
-  document.getElementById('mc-newpass').value='';
-  saveToStorage();
-  showToast('Password reset for '+s.fname+'.');
+  // Update locally and persist to server so all admin clients see the change
+  s.password = np;
+  document.getElementById('mc-password').textContent = np;
+  document.getElementById('mc-newpass').value = '';
+  // If this student exists on the backend, send a PATCH to update the password
+  (async () => {
+    try {
+      if (s.backendId) {
+        await apiRequest(`/api/students/${s.backendId}/`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: JSON.stringify({password: np})
+        });
+      }
+      saveToStorage();
+      showToast('Password reset for '+s.fname+'.');
+    } catch (err) {
+      console.error('Failed to update password on server:', err);
+      showToast('Password updated locally but failed to save to server.');
+    }
+  })();
 }
 function copyText(elId){
   const t=document.getElementById(elId).textContent;

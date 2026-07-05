@@ -81,9 +81,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
-        # Prevent password update through normal update
+        # Allow password update through normal update (admin-chosen passwords)
         data = request.data.copy()
-        data.pop('password', None)
         
         serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
