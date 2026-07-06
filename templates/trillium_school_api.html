@@ -1181,20 +1181,35 @@ function closeGallery(){
 <script>
 window.addEventListener('pageshow', function(event){
   if (event.persisted) {
-    location.reload();
+    refreshAllData(true);
   }
 });
 
 window.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') {
-    const lastRefresh = Number(localStorage.getItem('ts_lastRefresh') || '0');
-    const now = Date.now();
-    if (now - lastRefresh > 30000) {
-      localStorage.setItem('ts_lastRefresh', String(now));
-      window.location.reload();
-    }
+    refreshAllData(true);
   }
 });
+
+window.addEventListener('focus', function(){
+  refreshAllData(true);
+});
+
+window.addEventListener('online', function(){
+  refreshAllData(true);
+});
+
+async function refreshAllData(force = false){
+  const now = Date.now();
+  const lastRefresh = Number(localStorage.getItem('ts_lastRefresh') || '0');
+  if(!force && now - lastRefresh < 15000) return;
+  localStorage.setItem('ts_lastRefresh', String(now));
+  try {
+    await loadStudentsFromServer();
+  } catch (error) {
+    console.warn('Background refresh failed:', error);
+  }
+}
 
 // ========== DATA ==========
 let students = [];
@@ -1443,7 +1458,8 @@ async function apiRequest(url, options = {}){
   const response = await fetch(finalUrl, {
     credentials: 'same-origin',
     headers,
-    ...options
+    ...options,
+    cache: 'no-store'
   });
   if(!response.ok){
     let detail = 'Request failed';
@@ -2878,15 +2894,15 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   
   initAutoSave();
   
-  // Setup periodic refresh every 5 minutes to sync any updates
+  // Setup periodic refresh every 20 seconds to sync changes across devices
   setInterval(async () => {
     try {
-      await loadStudentsFromServer();
+      await refreshAllData(true);
       console.log('Periodic refresh completed');
     } catch (e) {
       console.log('Periodic refresh skipped:', e);
     }
-  }, 5 * 60 * 1000);
+  }, 20 * 1000);
 });
 
 // ========== AUTO-SAVE ON ALL CHANGES ==========
