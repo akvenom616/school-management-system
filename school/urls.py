@@ -8,6 +8,7 @@ router.register(r'fee-components', views.FeeComponentViewSet)
 router.register(r'fee-payments', views.FeePaymentViewSet)
 router.register(r'notices', views.NoticeViewSet)
 router.register(r'student-messages', views.StudentMessageViewSet)
+router.register(r'student-queries', views.StudentQueryViewSet)
 router.register(r'homeworks', views.HomeworkViewSet)
 
 app_name = 'school'

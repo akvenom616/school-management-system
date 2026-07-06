@@ -1,5 +1,14 @@
 from rest_framework import serializers
-from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, Homework
+from .models import (
+    Student,
+    FeeComponent,
+    StudentFeeComponent,
+    FeePayment,
+    Notice,
+    StudentMessage,
+    Homework,
+    StudentQuery,
+)
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -81,6 +90,16 @@ class StudentMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentMessage
         fields = ['id', 'student_id', 'student_name', 'title', 'content', 'date', 'created_at']
+        read_only_fields = ['id', 'created_at', 'student_id', 'student_name']
+
+
+class StudentQuerySerializer(serializers.ModelSerializer):
+    student_id = serializers.PrimaryKeyRelatedField(source='student', read_only=True)
+    student_name = serializers.CharField(source='student.name', read_only=True)
+
+    class Meta:
+        model = StudentQuery
+        fields = ['id', 'student_id', 'student_name', 'subject', 'message', 'reply', 'status', 'date', 'created_at']
         read_only_fields = ['id', 'created_at', 'student_id', 'student_name']
 
 

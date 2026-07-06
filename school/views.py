@@ -7,7 +7,17 @@ from django.shortcuts import get_object_or_404
 import hashlib
 import secrets
 
-from .models import Student, FeeComponent, StudentFeeComponent, FeePayment, Notice, StudentMessage, Homework, generate_random_password
+from .models import (
+    Student,
+    FeeComponent,
+    StudentFeeComponent,
+    FeePayment,
+    Notice,
+    StudentMessage,
+    Homework,
+    StudentQuery,
+    generate_random_password,
+)
 from .serializers import (
     StudentSerializer,
     StudentDetailSerializer,
@@ -17,6 +27,7 @@ from .serializers import (
     NoticeSerializer,
     StudentMessageSerializer,
     HomeworkSerializer,
+    StudentQuerySerializer,
 )
 
 
@@ -229,6 +240,26 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         payments = FeePayment.objects.filter(student_id=student_id)
         serializer = self.get_serializer(payments, many=True)
         return Response(serializer.data)
+
+
+class StudentQueryViewSet(viewsets.ModelViewSet):
+    """API endpoint for student queries shared between students and admin."""
+    queryset = StudentQuery.objects.all()
+    serializer_class = StudentQuerySerializer
+
+    def get_queryset(self):
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            return StudentQuery.objects.filter(student_id=student_id)
+        return StudentQuery.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        student_id = request.data.get('student_id')
+        student = get_object_or_404(Student, id=student_id)
+        serializer.save(student=student, status='Pending')
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class HomeworkViewSet(viewsets.ModelViewSet):

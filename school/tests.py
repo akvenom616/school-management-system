@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
-from .models import Homework
+from .models import Homework, Student, StudentQuery
 from .validators import ComplexPasswordValidator
 
 
@@ -24,6 +24,44 @@ class PasswordValidatorTests(SimpleTestCase):
 
     def test_accepts_a_strong_password(self):
         self.validator.validate('Abc12!wxyz')
+
+
+class StudentQueryApiTests(TestCase):
+    def test_student_query_can_be_created_and_replied(self):
+        student = Student.objects.create(
+            name='Asha Rao',
+            email='asha@example.com',
+            phone='1234567890',
+            class_name='Grade 5',
+            dob='2009-01-02',
+            parent_name='Ramesh Rao',
+            student_id='STU00001',
+            password='Password123!'
+        )
+
+        create_response = self.client.post(
+            reverse('school:studentquery-list'),
+            data=json.dumps({
+                'student_id': student.id,
+                'subject': 'Fee clarification',
+                'message': 'Could you share the fee breakup?',
+                'date': '2026-07-07',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        query_id = create_response.json()['id']
+
+        reply_response = self.client.patch(
+            reverse('school:studentquery-detail', args=[query_id]),
+            data=json.dumps({'reply': 'Will review shortly.', 'status': 'Replied'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(reply_response.status_code, 200)
+        self.assertEqual(reply_response.json()['reply'], 'Will review shortly.')
+        self.assertEqual(reply_response.json()['status'], 'Replied')
 
 
 class StudentSaveFlowTests(TestCase):

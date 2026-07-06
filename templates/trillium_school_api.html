@@ -1179,6 +1179,23 @@ function closeGallery(){
 <div id="toast"></div>
 
 <script>
+window.addEventListener('pageshow', function(event){
+  if (event.persisted) {
+    location.reload();
+  }
+});
+
+window.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') {
+    const lastRefresh = Number(localStorage.getItem('ts_lastRefresh') || '0');
+    const now = Date.now();
+    if (now - lastRefresh > 30000) {
+      localStorage.setItem('ts_lastRefresh', String(now));
+      window.location.reload();
+    }
+  }
+});
+
 // ========== DATA ==========
 let students = [];
 
@@ -1359,6 +1376,33 @@ function normalizeStudentMessageFromApi(message){
   };
 }
 
+function normalizeStudentQueryFromApi(query){
+  let sid = query.student_id;
+  try {
+    const found = students && students.find(s => String(s.backendId) === String(query.student_id));
+    if(found) sid = found.id;
+  } catch (e) {
+    // ignore and keep the raw backend id
+  }
+
+  const studentName = query.student_name || '';
+  const parts = studentName.split(/\s+/).filter(Boolean);
+  const fname = parts[0] || '';
+  const lname = parts.slice(1).join(' ') || '';
+
+  return {
+    id: query.id,
+    sid: sid,
+    fname,
+    lname,
+    date: query.date || '',
+    subject: query.subject || '',
+    message: query.message || '',
+    status: query.status || 'Pending',
+    reply: query.reply || ''
+  };
+}
+
 function getCookie(name){
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -1416,21 +1460,22 @@ async function apiRequest(url, options = {}){
 }
 
 async function loadStudentsFromServer(){
+  let items = [];
   try {
     const response = await apiRequest('/api/students/');
-    const items = Array.isArray(response) ? response : (response.results || []);
+    items = Array.isArray(response) ? response : (response.results || []);
     if (items && items.length) {
       students = items.map(student => normalizeStudentFromApi(student));
       studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
     } else {
-      console.warn('No students returned from server; restoring from local storage and aborting server refresh.');
+      console.warn('No students returned from server; restoring from local storage and continuing with available data.');
       loadFromStorage();
-      return;
     }
     await loadFeeComponentsFromServer();
     await loadNoticesFromServer();
     await loadFeePaymentsFromServer();
     await loadStudentMessagesFromServer();
+    await loadStudentQueriesFromServer();
     await loadStudentFeeComponentsFromServer();
     await loadHomeworksFromServer();
     console.log('Successfully loaded all data from server');
@@ -1459,6 +1504,8 @@ async function loadStudentsFromServer(){
   updateAdminStats();
   renderNoticesTb();
   renderPublicNotices();
+  renderQueriesTb();
+  renderStudentQueriesTb();
 }
 
 function parseApiList(response){
@@ -1530,6 +1577,22 @@ async function loadStudentMessagesFromServer(){
     console.log('Loaded student messages:', studentMessages);
   } catch (error) {
     console.error('Error loading student messages:', error);
+  }
+}
+
+async function loadStudentQueriesFromServer(){
+  try {
+    const response = await apiRequest('/api/student-queries/');
+    console.log('Student queries API response:', response);
+    const list = parseApiList(response);
+    if (list && list.length) {
+      queries = list.map(normalizeStudentQueryFromApi);
+    } else {
+      console.log('No student queries received from server; preserving existing queries.');
+    }
+    console.log('Loaded student queries:', queries);
+  } catch (error) {
+    console.error('Error loading student queries:', error);
   }
 }
 
@@ -2504,8 +2567,11 @@ async function deleteNotice(id){
 
 // ========== STUDENT QUERIES ==========
 function renderStudentQueriesTb(){
-  const stQueries=queries.filter(q=>q.sid===currentStudentSession.id);
-  document.getElementById('s-queries-tb').innerHTML=stQueries.length
+  if(!currentStudentSession) return;
+  const stQueries=queries.filter(q=>String(q.sid)===String(currentStudentSession.id));
+  const target=document.getElementById('s-queries-tb');
+  if(!target) return;
+  target.innerHTML=stQueries.length
     ?stQueries.map(q=>`
       <tr>
         <td style="font-size:0.82rem;">${q.date}</td>
@@ -2543,7 +2609,7 @@ function openStudentQueryModal(){
   document.getElementById('modal-query').classList.add('open');
 }
 
-function sendStudentQuery(){
+async function sendStudentQuery(){
   const subject=document.getElementById('mq-subject').value.trim();
   const message=document.getElementById('mq-message').value.trim();
   if(!subject||!message){showToast('Subject and message are required.');return;}
@@ -2551,22 +2617,44 @@ function sendStudentQuery(){
   const today=new Date();
   const date=today.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()]+' '+today.getFullYear();
   
-  queries.push({
-    id:Date.now(),
-    sid:currentStudentSession.id,
-    fname:currentStudentSession.fname,
-    lname:currentStudentSession.lname,
-    date,
-    subject,
-    message,
-    status:'Pending',
-    reply:''
-  });
-  
-  closeModal('modal-query');
-  renderStudentQueriesTb();
-  saveToStorage();
-  showToast('Query sent to admin successfully.');
+  try {
+    const created = await apiRequest('/api/student-queries/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        student_id: currentStudentSession.backendId,
+        subject,
+        message,
+        date,
+        status:'Pending',
+        reply:''
+      })
+    });
+    queries.unshift(normalizeStudentQueryFromApi(created));
+    closeModal('modal-query');
+    renderStudentQueriesTb();
+    renderQueriesTb();
+    saveToStorage();
+    showToast('Query sent to admin successfully.');
+  } catch (error) {
+    console.error('Error saving query to server:', error);
+    queries.unshift({
+      id:Date.now(),
+      sid:currentStudentSession.id,
+      fname:currentStudentSession.fname,
+      lname:currentStudentSession.lname,
+      date,
+      subject,
+      message,
+      status:'Pending',
+      reply:''
+    });
+    closeModal('modal-query');
+    renderStudentQueriesTb();
+    renderQueriesTb();
+    saveToStorage();
+    showToast('⚠️ Query saved locally; it will sync once the server is available.');
+  }
 }
 
 // ========== ADMIN QUERIES ==========
@@ -2598,26 +2686,44 @@ function openReplyModal(qid){
   document.getElementById('modal-reply').classList.add('open');
 }
 
-function sendAdminReply(){
+async function sendAdminReply(){
   const reply=document.getElementById('mr-reply').value.trim();
   if(!reply){showToast('Reply message is required.');return;}
   
   const q=queries.find(x=>x.id===queryReplyingId);
   if(!q)return;
   
-  q.reply=reply;
-  q.status='Replied';
+  try {
+    const updated = await apiRequest(`/api/student-queries/${q.id}/`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({reply, status:'Replied'})
+    });
+    const index = queries.findIndex(x=>x.id===q.id);
+    if(index >= 0) queries[index] = normalizeStudentQueryFromApi(updated);
+  } catch (error) {
+    console.error('Error sending reply to server:', error);
+    q.reply=reply;
+    q.status='Replied';
+  }
   
   closeModal('modal-reply');
   renderQueriesTb();
+  renderStudentQueriesTb();
   saveToStorage();
   showToast('Reply sent to '+q.fname+' successfully.');
 }
 
-function deleteQuery(qid){
+async function deleteQuery(qid){
   if(!confirm('Delete this query?'))return;
+  try {
+    await apiRequest(`/api/student-queries/${qid}/`, {method:'DELETE'});
+  } catch (error) {
+    console.error('Error deleting query from server:', error);
+  }
   queries=queries.filter(q=>q.id!==qid);
   renderQueriesTb();
+  renderStudentQueriesTb();
   saveToStorage();
   showToast('Query deleted.');
 }
