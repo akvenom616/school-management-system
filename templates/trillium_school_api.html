@@ -1378,9 +1378,16 @@ function normalizeStudentMessageFromApi(message){
 
 function normalizeStudentQueryFromApi(query){
   let sid = query.student_id;
+  const backendStudentId = query.student_id ?? query.studentId ?? '';
   try {
-    const found = students && students.find(s => String(s.backendId) === String(query.student_id));
-    if(found) sid = found.id;
+    const found = students && students.find(s => String(s.backendId) === String(backendStudentId));
+    if(found) {
+      sid = found.id;
+    } else if (currentStudentSession && String(currentStudentSession.backendId) === String(backendStudentId)) {
+      sid = currentStudentSession.id;
+    } else if (currentStudentSession && String(currentStudentSession.id) === String(backendStudentId)) {
+      sid = currentStudentSession.id;
+    }
   } catch (e) {
     // ignore and keep the raw backend id
   }
@@ -1506,12 +1513,24 @@ async function loadStudentsFromServer(){
   renderPublicNotices();
   renderQueriesTb();
   renderStudentQueriesTb();
+  syncCurrentStudentSession();
 }
 
 function parseApiList(response){
   if (Array.isArray(response)) return response;
   if (response && Array.isArray(response.results)) return response.results;
   return [];
+}
+
+function syncCurrentStudentSession(){
+  if(!currentStudentSession) return;
+  const latestStudent = students.find(s => String(s.id) === String(currentStudentSession.id) || String(s.backendId) === String(currentStudentSession.backendId));
+  if(!latestStudent) return;
+  currentStudentSession = { ...currentStudentSession, ...latestStudent };
+  const studentPage = document.getElementById('page-student');
+  if(studentPage && studentPage.classList.contains('active')){
+    loadStudentDash(currentStudentSession);
+  }
 }
 
 async function loadFeeComponentsFromServer(){
@@ -1710,12 +1729,7 @@ function loadStudentDash(st){
   document.getElementById('sd-address').textContent=st.address;
 
   // Announcements - display notices on student profile
-  const announceBoard=document.getElementById('student-announcements');
-  const personalMsgs = studentMessages.filter(m=>m.studentId===st.id);
-  const personalItems = personalMsgs.map(m=>`<div class="notice-item"><div class="notice-date">${m.date}</div><div class="notice-text"><strong>${m.title}</strong> — ${m.content}</div></div>`).join('');
-  const generalItems = notices.slice(0,5).map(n=>`<div class="notice-item"><div class="notice-date">${n.date}</div><div class="notice-text"><strong>${n.title}</strong> — ${n.desc}</div></div>`).join('');
-  const items = personalItems + generalItems;
-  announceBoard.innerHTML=`<div class="notice-hdr">📢 Announcements <span style="font-size:0.72rem;opacity:0.7;">From Admin</span></div>${items||'<div class="notice-item"><div class="notice-text">No announcements at this time.</div></div>'}`;
+  renderPublicNotices();
 
   const subjs=[
     {s:'Mathematics',t:'Mrs. Anita Gupta',a:'92%'},
@@ -2277,13 +2291,18 @@ async function recordPaymentFromFeeEdit(){
     s.paid+=amount;
     const rem=s.annualFee-s.paid;
     s.feeStatus=rem<=0?'Paid':s.paid>0?'Partial':'Pending';
+    if(rem<=0)s.dueDate='—';
     document.getElementById('mfe-paid').value=s.paid;
   }
   
   // Clear inputs and reload history
   ['mfe-pay-date','mfe-pay-amount','mfe-pay-ref'].forEach(id=>document.getElementById(id).value='');
   renderPaymentHistoryForStudent(sid);
+  renderFeesTb();
+  updateAdminStats();
+  renderRecentFees();
   saveToStorage();
+  syncCurrentStudentSession();
   showToast('Payment recorded successfully.');
 }
 
@@ -2366,6 +2385,7 @@ async function savePayment(){
   closeModal('modal-payment');
   renderFeesTb();updateAdminStats();renderRecentFees();
   saveToStorage();
+  syncCurrentStudentSession();
 }
 
 // ========== FEE STRUCTURE BUILDER ==========
@@ -2508,12 +2528,21 @@ function renderNoticesTb(){
 }
 function renderPublicNotices(){
   const board=document.getElementById('public-notice-board');
-  if(!board) {
-    console.log('Notice board element not found on this page');
-    return; // guard in case the element is missing in some views
-  }
+  const announceBoard=document.getElementById('student-announcements');
   const items=notices.slice(0,5).map(n=>`<div class="notice-item"><div class="notice-date">${n.date}</div><div class="notice-text"><strong>${n.title}</strong> — ${n.desc}</div></div>`).join('');
-  board.innerHTML=`<div class="notice-hdr">📋 School Notices <span style="font-size:0.72rem;opacity:0.7;">June 2025</span></div>${items||'<div class="notice-item"><div class="notice-text">No notices at this time.</div></div>'}`;
+
+  if(board){
+    board.innerHTML=`<div class="notice-hdr">📋 School Notices <span style="font-size:0.72rem;opacity:0.7;">June 2025</span></div>${items||'<div class="notice-item"><div class="notice-text">No notices at this time.</div></div>'}`;
+  }
+
+  if(announceBoard){
+    const personalMsgs = (studentMessages || []).filter(m=>m.studentId===String(currentStudentSession?.id || ''));
+    const personalItems = personalMsgs.map(m=>`<div class="notice-item"><div class="notice-date">${m.date}</div><div class="notice-text"><strong>${m.title}</strong> — ${m.content}</div></div>`).join('');
+    const generalItems = items;
+    const combinedItems = personalItems + generalItems;
+    announceBoard.innerHTML=`<div class="notice-hdr">📢 Announcements <span style="font-size:0.72rem;opacity:0.7;">From Admin</span></div>${combinedItems||'<div class="notice-item"><div class="notice-text">No announcements at this time.</div></div>'}`;
+  }
+
   console.log('Public notices rendered:', notices.length);
 }
 function openNoticeModal(){
@@ -2568,7 +2597,10 @@ async function deleteNotice(id){
 // ========== STUDENT QUERIES ==========
 function renderStudentQueriesTb(){
   if(!currentStudentSession) return;
-  const stQueries=queries.filter(q=>String(q.sid)===String(currentStudentSession.id));
+  const stQueries=queries.filter(q=>
+    String(q.sid)===String(currentStudentSession.id) ||
+    String(q.sid)===String(currentStudentSession.backendId)
+  );
   const target=document.getElementById('s-queries-tb');
   if(!target) return;
   target.innerHTML=stQueries.length
@@ -2618,7 +2650,7 @@ async function sendStudentQuery(){
   const date=today.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()]+' '+today.getFullYear();
   
   try {
-    const created = await apiRequest('/api/student-queries/', {
+    await apiRequest('/api/student-queries/', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -2630,7 +2662,7 @@ async function sendStudentQuery(){
         reply:''
       })
     });
-    queries.unshift(normalizeStudentQueryFromApi(created));
+    await loadStudentQueriesFromServer();
     closeModal('modal-query');
     renderStudentQueriesTb();
     renderQueriesTb();
@@ -2694,13 +2726,12 @@ async function sendAdminReply(){
   if(!q)return;
   
   try {
-    const updated = await apiRequest(`/api/student-queries/${q.id}/`, {
+    await apiRequest(`/api/student-queries/${q.id}/`, {
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({reply, status:'Replied'})
     });
-    const index = queries.findIndex(x=>x.id===q.id);
-    if(index >= 0) queries[index] = normalizeStudentQueryFromApi(updated);
+    await loadStudentQueriesFromServer();
   } catch (error) {
     console.error('Error sending reply to server:', error);
     q.reply=reply;
@@ -2718,10 +2749,11 @@ async function deleteQuery(qid){
   if(!confirm('Delete this query?'))return;
   try {
     await apiRequest(`/api/student-queries/${qid}/`, {method:'DELETE'});
+    await loadStudentQueriesFromServer();
   } catch (error) {
     console.error('Error deleting query from server:', error);
+    queries=queries.filter(q=>q.id!==qid);
   }
-  queries=queries.filter(q=>q.id!==qid);
   renderQueriesTb();
   renderStudentQueriesTb();
   saveToStorage();
