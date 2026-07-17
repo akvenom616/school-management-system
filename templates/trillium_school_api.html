@@ -314,6 +314,7 @@ tr:hover td{background:#fafaf8;}
       <a onclick="scrollToSection('notices')">Notices</a>
       <a onclick="scrollToSection('contact')">Contact</a>
       <button class="btn-portal" onclick="showPage('login')">🎓 Student Portal</button>
+      <button class="btn-portal" style="margin-left:0.5rem;" onclick="forceRefreshData()">🔄 Refresh Data</button>
       <div id="app-version" style="font-size:0.72rem;color:rgba(255,255,255,0.85);padding-left:8px;opacity:0.9">v?</div>
     </div>
     <button class="hamburger" onclick="toggleMobileMenu()">☰</button>
@@ -324,6 +325,7 @@ tr:hover td{background:#fafaf8;}
     <a onclick="scrollToSection('notices');toggleMobileMenu()">Notices</a>
     <a onclick="scrollToSection('contact');toggleMobileMenu()">Contact</a>
     <button class="btn-portal" style="align-self:flex-start;margin-top:4px;" onclick="showPage('login')">🎓 Student Portal</button>
+    <button class="btn-portal" style="align-self:flex-start;margin-top:4px;" onclick="forceRefreshData()">🔄 Refresh Data</button>
   </div>
 
   <div class="hero">
@@ -1486,14 +1488,9 @@ async function loadStudentsFromServer(){
   let items = [];
   try {
     const response = await apiRequest('/api/students/');
-    items = Array.isArray(response) ? response : (response.results || []);
-    if (items && items.length) {
-      students = items.map(student => normalizeStudentFromApi(student));
-      studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
-    } else {
-      console.warn('No students returned from server; restoring from local storage and continuing with available data.');
-      loadFromStorage();
-    }
+    items = parseApiList(response);
+    students = items.map(student => normalizeStudentFromApi(student));
+    studentFeeComponents = Object.fromEntries(students.map(s => [s.id, []]));
     await loadFeeComponentsFromServer();
     await loadNoticesFromServer();
     await loadFeePaymentsFromServer();
@@ -1554,11 +1551,7 @@ async function loadFeeComponentsFromServer(){
     const response = await apiRequest('/api/fee-components/');
     console.log('Fee components API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      feeComponents = list.map(normalizeFeeComponentFromApi);
-    } else {
-      console.log('No fee components received from server; preserving existing components.');
-    }
+    feeComponents = list.map(normalizeFeeComponentFromApi);
     console.log('Loaded fee components:', feeComponents);
   } catch (error) {
     console.error('Error loading fee components:', error);
@@ -1570,11 +1563,7 @@ async function loadNoticesFromServer(){
     const response = await apiRequest('/api/notices/');
     console.log('Notices API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      notices = list.map(normalizeNoticeFromApi);
-    } else {
-      console.log('No notices received from server; preserving existing notices.');
-    }
+    notices = list.map(normalizeNoticeFromApi);
     console.log('Loaded notices:', notices);
   } catch (error) {
     console.error('Error loading notices:', error);
@@ -1586,11 +1575,7 @@ async function loadFeePaymentsFromServer(){
     const response = await apiRequest('/api/fee-payments/');
     console.log('Fee payments API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      feePayments = list.map(normalizeFeePaymentFromApi);
-    } else {
-      console.log('No fee payments received from server; preserving existing payments.');
-    }
+    feePayments = list.map(normalizeFeePaymentFromApi);
     console.log('Loaded fee payments:', feePayments);
     // Recompute per-student paid totals whenever payments are (re)loaded
     try{ updateStudentPaidAmounts(); saveToStorage(); }catch(e){console.error('Failed to update student paid amounts:',e)}
@@ -1604,11 +1589,7 @@ async function loadStudentMessagesFromServer(){
     const response = await apiRequest('/api/student-messages/');
     console.log('Student messages API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      studentMessages = list.map(normalizeStudentMessageFromApi);
-    } else {
-      console.log('No student messages received from server; preserving existing messages.');
-    }
+    studentMessages = list.map(normalizeStudentMessageFromApi);
     console.log('Loaded student messages:', studentMessages);
   } catch (error) {
     console.error('Error loading student messages:', error);
@@ -1620,11 +1601,7 @@ async function loadStudentQueriesFromServer(){
     const response = await apiRequest('/api/student-queries/');
     console.log('Student queries API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      queries = list.map(normalizeStudentQueryFromApi);
-    } else {
-      console.log('No student queries received from server; preserving existing queries.');
-    }
+    queries = list.map(normalizeStudentQueryFromApi);
     console.log('Loaded student queries:', queries);
   } catch (error) {
     console.error('Error loading student queries:', error);
@@ -1640,11 +1617,7 @@ async function loadStudentFeeComponentsFromServer(){
       const list = parseApiList(response);
       return [student.id, list.map(item => ({id:item.id,name:item.name,amount:Number(item.amount)||0}))];
     }));
-    if (results && results.length) {
-      studentFeeComponents = Object.fromEntries(results);
-    } else {
-      console.log('No student fee components received; preserving existing studentFeeComponents.');
-    }
+    studentFeeComponents = Object.fromEntries(results);
     console.log('All student fee components loaded:', studentFeeComponents);
   } catch (error) {
     console.error('Error loading student fee components:', error);
@@ -1656,11 +1629,7 @@ async function loadHomeworksFromServer(){
     const response = await apiRequest('/api/homeworks/');
     console.log('Homeworks API response:', response);
     const list = parseApiList(response);
-    if (list && list.length) {
-      homeworks = list.map(normalizeHomeworkFromApi);
-    } else {
-      console.log('No homeworks received from server; preserving existing homeworks.');
-    }
+    homeworks = list.map(normalizeHomeworkFromApi);
     console.log('Loaded homeworks:', homeworks);
   } catch (error) {
     console.error('Error loading homeworks:', error);
