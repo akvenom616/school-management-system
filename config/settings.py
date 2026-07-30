@@ -9,9 +9,12 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-chang
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='school-management-system-tkx5.onrender.com,trilliumschool.in,www.trilliumschool.in,localhost,127.0.0.1',
+    default='school-management-system-tkx5.onrender.com,*.onrender.com,trilliumschool.in,www.trilliumschool.in,localhost,127.0.0.1',
     cast=Csv()
 )
 
@@ -128,21 +131,15 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100,
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "https://trilliumschool.in",
-    "https://www.trilliumschool.in",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8001",
-    "http://127.0.0.1:8001",
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='https://trilliumschool.in,https://www.trilliumschool.in,http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8001,http://127.0.0.1:8001',
+    cast=Csv()
+)
 
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = [
-    "https://trilliumschool.in",
-    "https://www.trilliumschool.in",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://trilliumschool.in,https://www.trilliumschool.in,http://localhost:8000,http://127.0.0.1:8000',
+    cast=Csv()
+)
