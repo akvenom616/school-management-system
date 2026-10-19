@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from decouple import config, Csv
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -70,13 +71,22 @@ if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-else:
+    if not DEBUG and DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+        raise ImproperlyConfigured(
+            "Production DATABASE_URL must use a shared database engine; SQLite is not supported."
+        )
+elif DEBUG:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+else:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must point to a persistent shared database in production. "
+        "SQLite is only supported for local development."
+    )
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

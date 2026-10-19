@@ -65,6 +65,26 @@ class StudentQueryApiTests(TestCase):
 
 
 class StudentSaveFlowTests(TestCase):
+    def test_student_login_reads_persisted_student_record(self):
+        student = Student.objects.create(
+            name='Saved Student',
+            email='saved-login@example.com',
+            phone='1234567890',
+            class_name='Pre-Nursery',
+            parent_name='Parent',
+            student_id='STU54321',
+            password='Password123!'
+        )
+
+        response = self.client.post(
+            '/api/students/login/',
+            data=json.dumps({'student_id': student.student_id, 'password': student.password}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['student_id'], student.student_id)
+
     def test_home_page_exposes_csrf_token(self):
         response = self.client.get(reverse('home'))
 

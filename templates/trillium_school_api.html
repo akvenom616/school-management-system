@@ -1668,16 +1668,29 @@ function switchTab(t){
   document.getElementById('lf-student').style.display=t==='student'?'block':'none';
   document.getElementById('lf-admin').style.display=t==='admin'?'block':'none';
 }
-function loginStudent(){
+async function loginStudent(){
   const id=document.getElementById('s-id').value.trim();
   const pass=document.getElementById('s-pass').value.trim();
-  const st=students.find(s=>s.username===id||s.id===id);
   const err=document.getElementById('s-err');
-  if(st && pass===st.password){
+  err.style.display='none';
+  try {
+    const authenticated = await apiRequest('/api/students/login/', {
+      method:'POST',
+      body:JSON.stringify({student_id:id,password:pass})
+    });
+    const student = normalizeStudentFromApi(authenticated);
+    const existingIndex = students.findIndex(s => String(s.backendId) === String(student.backendId));
+    if(existingIndex >= 0){
+      students[existingIndex] = {...students[existingIndex], ...student};
+    } else {
+      students.unshift(student);
+    }
+    const st = students.find(s => String(s.backendId) === String(student.backendId));
     err.style.display='none';
     loadStudentDash(st);
     showPage('student');
-  } else {
+  } catch(error) {
+    err.textContent=error.message || 'Invalid student ID or password';
     err.style.display='block';
   }
 }

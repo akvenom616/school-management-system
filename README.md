@@ -176,6 +176,10 @@ Suggested schedule:
 
 Use Nginx as a reverse proxy, Gunicorn as the application server, and systemd to ensure automatic restarts after failures.
 
+### Production Database
+
+Set `DEBUG=False` and configure `DATABASE_URL` to a persistent PostgreSQL database shared by every application instance. Run `python manage.py migrate` against that same database before starting Gunicorn. Production startup now fails when `DATABASE_URL` is missing rather than silently storing records in instance-local SQLite; SQLite is reserved for local development.
+
 ## Troubleshooting
 
 ### MySQL Connection Error
