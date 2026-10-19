@@ -20,6 +20,8 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f5f0;color:#2C2C2A;min-height:100vh;overflow-x:hidden;}
+button,a{touch-action:manipulation;}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--t400);outline-offset:2px;}
 
 /* PAGES */
 .page{display:none;min-height:100vh;}.page.active{display:block;}
@@ -239,8 +241,10 @@ tr:hover td{background:#fafaf8;}
 @media(max-width:768px){
   .nav-links{display:none;}
   .hamburger{display:flex;align-items:center;}
+  .pub-nav{min-height:64px;padding:0.5rem 0.9rem;}
+  .nav-brand{width:auto;}
   .portal-card{max-width:100%;padding:1.2rem;}
-  .sidebar{transform:translateX(-100%);width:min(86vw,320px);max-width:320px;}
+  .sidebar{transform:translateX(-100%);width:min(86vw,340px);max-width:340px;}
   .sidebar.open{transform:translateX(0);}
   .dash-content{margin-left:0;}
   .hamburger-dash{display:flex;align-items:center;}
@@ -255,13 +259,13 @@ tr:hover td{background:#fafaf8;}
   .hero p{margin-bottom:1.25rem;}
   .hero-btns{gap:8px;}
   .stats-bar{padding:1rem;gap:1rem;}
-  .dash-topbar{padding:0.75rem 0.9rem;height:auto;flex-wrap:wrap;gap:0.5rem;}
-  .dash-main{padding:0.9rem;}
+  .dash-topbar{padding:0.65rem 0.9rem;min-height:60px;height:auto;gap:0.5rem;}
+  .dash-main{padding:1rem;}
   .dash-header{margin-bottom:1rem;}
   .dash-header h1{font-size:1.1rem;}
   .s-profile-hdr{padding:1rem;flex-direction:column;align-items:flex-start;}
   .s-avatar{width:48px;height:48px;font-size:1.1rem;}
-  .info-grid,.stat-cards,.fee-summary-grid{grid-template-columns:1fr 1fr;}
+  .info-grid,.stat-cards,.fee-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
   .table-card{margin-bottom:1rem;border-radius:10px;}
   .table-wrap{overflow-x:auto;}
   table{min-width:560px;font-size:0.78rem;}
@@ -276,11 +280,19 @@ tr:hover td{background:#fafaf8;}
   .sidebar-nav a{padding:10px 1rem;}
 }
 @media(max-width:480px){
-  .stat-cards,.info-grid,.fee-summary-grid{grid-template-columns:1fr;}
-  .sidebar{width:100%;max-width:100%;}
+  .stat-cards,.info-grid,.fee-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .sidebar{width:min(88vw,340px);max-width:340px;}
   .dash-main{padding:0.75rem;}
   .toolbar input[type=text],.toolbar input[type=number],.toolbar select{font-size:0.95rem;}
   .btn-primary,.btn-cancel,.btn-sm{font-size:0.8rem;}
+  input[type=text],input[type=password],input[type=email],input[type=number],select,textarea{min-height:44px;}
+  .s-profile-hdr{flex-direction:row;align-items:center;}
+  .s-info{min-width:0;}
+  .stat-card{padding:0.8rem;}
+  .stat-card .snum{font-size:1.3rem;}
+  .dash-topbar h2{font-size:0.92rem;}
+  .topbar-right{font-size:0.72rem;}
+  .hero-btns>*{width:100%;}
 }
 
 /* FRONT PAGE ENHANCEMENTS */
@@ -314,8 +326,6 @@ tr:hover td{background:#fafaf8;}
       <a onclick="scrollToSection('notices')">Notices</a>
       <a onclick="scrollToSection('contact')">Contact</a>
       <button class="btn-portal" onclick="showPage('login')">🎓 Student Portal</button>
-      <button class="btn-portal" style="margin-left:0.5rem;" onclick="forceRefreshData()">🔄 Refresh Data</button>
-      <div id="app-version" style="font-size:0.72rem;color:rgba(255,255,255,0.85);padding-left:8px;opacity:0.9">v?</div>
     </div>
     <button class="hamburger" onclick="toggleMobileMenu()">☰</button>
   </nav>
@@ -325,7 +335,6 @@ tr:hover td{background:#fafaf8;}
     <a onclick="scrollToSection('notices');toggleMobileMenu()">Notices</a>
     <a onclick="scrollToSection('contact');toggleMobileMenu()">Contact</a>
     <button class="btn-portal" style="align-self:flex-start;margin-top:4px;" onclick="showPage('login')">🎓 Student Portal</button>
-    <button class="btn-portal" style="align-self:flex-start;margin-top:4px;" onclick="forceRefreshData()">🔄 Refresh Data</button>
   </div>
 
   <div class="hero">
@@ -610,7 +619,7 @@ function closeGallery(){
   <div class="dash-content">
     <div class="dash-topbar">
       <div style="display:flex;align-items:center;gap:10px;">
-        <button class="hamburger-dash" onclick="openSidebar('student')">☰</button>
+        <button class="hamburger-dash" id="student-menu-toggle" aria-label="Open student navigation" aria-expanded="false" onclick="openSidebar('student')">☰</button>
         <h2 id="s-topbar-title">My Profile</h2>
       </div>
       <div class="topbar-right">
@@ -759,7 +768,7 @@ function closeGallery(){
   <div class="dash-content">
     <div class="dash-topbar">
       <div style="display:flex;align-items:center;gap:10px;">
-        <button class="hamburger-dash" onclick="openSidebar('admin')">☰</button>
+        <button class="hamburger-dash" id="admin-menu-toggle" aria-label="Open admin navigation" aria-expanded="false" onclick="openSidebar('admin')">☰</button>
         <h2 id="a-topbar-title">Overview</h2>
       </div>
       <div class="topbar-right">
@@ -775,7 +784,6 @@ function closeGallery(){
             <h1>Admin Dashboard</h1>
             <p>Trillium School Management System</p>
           </div>
-          <button class="btn-primary" onclick="forceRefreshData()" style="white-space:nowrap;"><span>🔄</span> Force Refresh All Data</button>
         </div>
         <div class="stat-cards">
           <div class="stat-card green"><div class="slabel">Total Students</div><div class="snum" id="a-stat-students">0</div><div class="ssub">Enrolled 2024-25</div></div>
@@ -1648,18 +1656,34 @@ function scrollToSection(id){
 }
 function toggleMobileMenu(){
   const m=document.getElementById('mobile-menu');
-  m.classList.toggle('open');
+  const isOpen=m.classList.toggle('open');
+  document.querySelector('.hamburger').setAttribute('aria-expanded',String(isOpen));
 }
 
 // ========== SIDEBAR MOBILE ==========
 function openSidebar(role){
   document.getElementById(role+'-sidebar').classList.add('open');
   document.getElementById(role[0]+'-overlay').classList.add('show');
+  document.getElementById(role+'-menu-toggle').setAttribute('aria-expanded','true');
 }
 function closeSidebar(role){
   document.getElementById(role+'-sidebar').classList.remove('open');
   document.getElementById(role[0]+'-overlay').classList.remove('show');
+  document.getElementById(role+'-menu-toggle').setAttribute('aria-expanded','false');
 }
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape') return;
+  closeSidebar('student');
+  closeSidebar('admin');
+  const mobileMenu=document.getElementById('mobile-menu');
+  if(mobileMenu.classList.contains('open')) toggleMobileMenu();
+});
+window.addEventListener('resize',()=>{
+  if(window.innerWidth>768){
+    const mobileMenu=document.getElementById('mobile-menu');
+    if(mobileMenu.classList.contains('open')) toggleMobileMenu();
+  }
+});
 
 // ========== LOGIN ==========
 function switchTab(t){
@@ -2857,14 +2881,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   await unregisterServiceWorkers();
   // Load any cached state first to avoid accidental wipes when server returns empty lists
   try{ loadFromStorage(); } catch(e){ console.warn('loadFromStorage failed', e); }
-  // Show current app version in UI for cache/debugging purposes
-  try{
-    const verEl = document.getElementById('app-version');
-    if(verEl){
-      const v = localStorage.getItem('ts_version') || STORAGE_VERSION || 'v?';
-      verEl.textContent = v;
-    }
-  }catch(e){}
   try {
     // Try to load from server first for fresh data
     await loadStudentsFromServer();
@@ -2891,29 +2907,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 function initAutoSave(){
   // Auto-save is now handled inline with saveToStorage() calls in all functions
   // This ensures data persists to localStorage immediately after any change
-}
-
-// Force refresh all data and clear caches
-async function forceRefreshData(){
-  showToast('🔄 Refreshing data from server...');
-  
-  // Reset all cached state and reload fresh data from server
-  students = [];
-  feeComponents = [];
-  feePayments = [];
-  notices = [];
-  studentFeeComponents = {};
-  studentMessages = [];
-  homeworks = [];
-  queries = [];
-  
-  try {
-    await loadStudentsFromServer();
-    showToast('✅ Data refreshed successfully!');
-  } catch (error) {
-    showToast('⚠️ Could not refresh from server. Please refresh the page manually.');
-    console.error('Force refresh error:', error);
-  }
 }
 
 // Helper function to save data and trigger UI update
